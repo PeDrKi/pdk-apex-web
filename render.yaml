@@ -1,0 +1,43 @@
+# Render Blueprint: backend FastAPI chạy gói miễn phí (không dùng Docker).
+# Giao diện chạy trên Vercel (xem frontend/vercel.json), dữ liệu nằm ở Supabase.
+# Hướng dẫn từng bước: DEPLOY.md
+services:
+  - type: web
+    name: pdk-apex-api
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      # Gói free có 512 MB RAM: ảnh Full HD (~2,1 triệu điểm ảnh) dùng khoảng 400 MB khi giấu tin,
+      # nên giới hạn ảnh và chỉ xử lý một việc nặng mỗi lúc.
+      - key: MAX_UPLOAD_MB
+        value: "10"
+      - key: MAX_PIXELS
+        value: "2100000"
+      - key: MAX_HEAVY_JOBS
+        value: "1"
+      - key: RATE_LIMIT_PER_MIN
+        value: "60"
+      - key: LOGIN_ATTEMPTS_PER_MIN
+        value: "10"
+      # Sau proxy của Vercel và Render, IP thật của người dùng nằm đầu header này.
+      - key: CLIENT_IP_HEADER
+        value: x-forwarded-for
+      - key: COOKIE_SECURE
+        value: "1"
+      # Điền trên trang Render (không đưa bí mật vào mã nguồn):
+      - key: DATABASE_URL          # Supabase > Connect > Session pooler
+        sync: false
+      - key: SUPABASE_URL          # https://<mã-dự-án>.supabase.co
+        sync: false
+      - key: SUPABASE_SERVICE_KEY  # Supabase > Project Settings > API Keys > service_role
+        sync: false
+      - key: TRUSTED_ORIGINS       # địa chỉ trang Vercel, ví dụ https://pdk-apex.vercel.app
+        sync: false

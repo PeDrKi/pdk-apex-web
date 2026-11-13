@@ -1,0 +1,12 @@
+node_modules/
+dist/
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+.env
+*.npz
+*.tsbuildinfo
+backend/data/
+deploy/deploy-config.json
+frontend/.vercel/

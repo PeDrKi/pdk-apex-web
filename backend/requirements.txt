@@ -1,0 +1,9 @@
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30
+python-multipart>=0.0.18
+numpy>=1.24
+pillow>=10.3
+opencv-python-headless>=4.8
+cryptography>=43
+# Chỉ dùng khi đặt DATABASE_URL (Postgres, ví dụ Supabase)
+psycopg[binary]>=3.2,<4

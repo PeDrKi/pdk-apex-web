@@ -66,10 +66,9 @@ class SupabaseStorage:
 
     def _request(self, method: str, path: str, body: bytes | None = None,
                  content_type: str = "application/json", extra: dict | None = None):
-        auth = {} if self.key.startswith("sb_") else {"Authorization": f"Bearer {self.key}"}
         req = urllib.request.Request(self.base + path, data=body, method=method, headers={
             "apikey": self.key,
-            **auth,
+            "Authorization": f"Bearer {self.key}",
             "Content-Type": content_type,
             **(extra or {}),
         })

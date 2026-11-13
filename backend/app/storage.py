@@ -8,6 +8,7 @@ Khoá file có dạng "<id người dùng>/<id mục>.<đuôi>", do máy chủ t
 from __future__ import annotations
 
 import json
+import logging
 import re
 import threading
 import urllib.error
@@ -19,6 +20,9 @@ from .config import settings
 from .db import DATA_DIR
 
 KEY_RE = re.compile(r"^\d{1,12}/[0-9a-f]{24}\.(png|npz|jpg)$")
+
+
+_log = logging.getLogger("apex.storage")
 
 
 class StorageError(RuntimeError):
@@ -62,9 +66,10 @@ class SupabaseStorage:
 
     def _request(self, method: str, path: str, body: bytes | None = None,
                  content_type: str = "application/json", extra: dict | None = None):
+        auth = {} if self.key.startswith("sb_") else {"Authorization": f"Bearer {self.key}"}
         req = urllib.request.Request(self.base + path, data=body, method=method, headers={
             "apikey": self.key,
-            "Authorization": f"Bearer {self.key}",
+            **auth,
             "Content-Type": content_type,
             **(extra or {}),
         })
@@ -86,6 +91,7 @@ class SupabaseStorage:
                 {"id": self.bucket, "name": self.bucket, "public": False}).encode())
             # 200 = vừa tạo; 400/409 kèm "already exists" = đã có sẵn.
             if status >= 300 and b"exist" not in body.lower():
+                _log.error("Supabase bucket %s: %s", status, body[:300])
                 raise StorageError(f"Không tạo được bucket lưu trữ ({status}).")
             self._bucket_ready = True
 
@@ -96,6 +102,7 @@ class SupabaseStorage:
         self._ensure_bucket()
         status, body = self._request("POST", self._obj(key), data, content_type, {"x-upsert": "true"})
         if status >= 300:
+            _log.error("Supabase put %s: %s", status, body[:300])
             raise StorageError(f"Không lưu được file ({status}).")
 
     def get(self, key: str) -> bytes | None:

@@ -15,6 +15,7 @@ import base64
 import hashlib
 import hmac
 import io
+import logging
 import re
 import secrets
 import time
@@ -359,7 +360,8 @@ def store_item(user_id: int, stego_data: bytes, keys_data: bytes, *, name: str, 
         except Exception as e:
             _delete_files(user_id, [item_id])
             if isinstance(e, StorageError):
-                raise HTTPException(503, "Kho lưu trữ đang lỗi, chưa lưu được. Hãy thử lại sau.")
+                logging.getLogger("apex.storage").error("store_item: %s", e)
+                raise HTTPException(503, f"Kho lưu trữ đang lỗi, chưa lưu được ({e}). Hãy thử lại sau.")
             raise
     return row
 

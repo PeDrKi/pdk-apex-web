@@ -57,8 +57,9 @@ class SupabaseStorage:
     """Gọi REST API của Supabase Storage bằng thư viện chuẩn, không cần cài thêm gói."""
 
     def __init__(self, url: str, key: str, bucket: str, timeout: float = 30):
-        self.base = url.rstrip("/") + "/storage/v1"
-        self.key = key
+        self.base = url.strip().strip('"\'').rstrip("/") + "/storage/v1"
+        # Bỏ dấu cách, xuống dòng, dấu ngoặc kép dán nhầm quanh khoá.
+        self.key = "".join(key.split()).strip('"\'')
         self.bucket = bucket
         self.timeout = timeout
         self._bucket_ready = False
@@ -80,6 +81,22 @@ class SupabaseStorage:
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             raise StorageError(f"Không kết nối được kho lưu trữ: {e}") from None
 
+    def _key_shape(self) -> str:
+        """Mô tả hình dạng khoá để chẩn đoán, không lộ khoá."""
+        k = self.key
+        role = "?"
+        parts = k.split(".")
+        if len(parts) == 3:
+            try:
+                import base64
+                pad = parts[1] + "=" * (-len(parts[1]) % 4)
+                role = str(json.loads(base64.urlsafe_b64decode(pad)).get("role"))
+            except Exception:
+                role = "khong doc duoc"
+        kind = "sb_secret" if k.startswith("sb_secret_") else "sb_publishable" if k.startswith(
+            "sb_publishable_") else "jwt" if k.startswith("eyJ") else "la"
+        return f"loai={kind} dai={len(k)} so_doan={len(parts)} role={role}"
+
     def _ensure_bucket(self) -> None:
         if self._bucket_ready:
             return
@@ -91,6 +108,7 @@ class SupabaseStorage:
             # 200 = vừa tạo; 400/409 kèm "already exists" = đã có sẵn.
             if status >= 300 and b"exist" not in body.lower():
                 _log.error("Supabase bucket %s: %s", status, body[:300])
+                _log.error("Khoa dang dung: %s", self._key_shape())
                 raise StorageError(f"Không tạo được bucket lưu trữ ({status}).")
             self._bucket_ready = True
 

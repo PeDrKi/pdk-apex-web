@@ -8,6 +8,7 @@ export interface Health {
   bc7_available: boolean;
   max_upload_mb: number;
   max_redundancy: number;
+  detect_enabled?: boolean;
 }
 
 export interface CapacityResult {

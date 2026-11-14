@@ -41,3 +41,11 @@ def test_default_strength_is_gentle_and_still_reads_back():
     r = TestClient(app).post("/api/extract", files={"image": ("s.png", stego, "image/png"),
                                                     "keys": ("k.npz", base64.b64decode(j["keys_npz_base64"]))})
     assert r.status_code == 200 and r.json()["message"] == "thong diep bi mat de thu bo do"
+
+
+def test_detect_hidden_when_disabled(monkeypatch):
+    import dataclasses
+    from app import main
+    monkeypatch.setattr(main, "settings", dataclasses.replace(main.settings, show_detect=False))
+    out = _embed(redundancy="1", delta="5")
+    assert out["detect_level"] is None and out["detect_score"] is None

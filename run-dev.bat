@@ -1,6 +1,8 @@
 @echo off
 REM Chạy backend (cổng 8000) và frontend dev (cổng 5173) trong 2 cửa sổ riêng.
 cd /d "%~dp0"
+REM Bản local hiện "Khả năng bị phát hiện"; bản deploy thì không.
+set SHOW_DETECT=1
 if not exist backend\.venv (
   python -m venv backend\.venv
   backend\.venv\Scripts\pip install -r backend\requirements-dev.txt

@@ -1,4 +1,4 @@
-export function AboutPanel() {
+export function AboutPanel({ showDetect = false }: { showDetect?: boolean }) {
   return (
     <article className="panel prose">
       <h2>APEX giấu tin như thế nào?</h2>
@@ -35,13 +35,13 @@ export function AboutPanel() {
         trở lên mắt thường khó thấy, dưới 38 dB web sẽ cảnh báo. Nếu việc bị phát hiện là có giấu tin gây nguy hiểm cho
         bạn, đừng dựa vào công cụ này.
       </p>
-      <p>
+      {showDetect && (<p>
         Sau mỗi lần giấu tin, web tự chạy một <strong>bộ dò</strong> đóng vai người biết rõ thuật toán APEX nhưng không
         có file khoá. Bộ dò đo xem bao nhiêu khối 4×4 nằm đúng trên lưới lượng tử, rồi so với ảnh gốc. Kết quả phụ thuộc
         chủ yếu vào <strong>số khối bị đụng tới</strong>, tức độ dài nội dung nhân với độ dự phòng, chia cho kích thước
         ảnh. Giảm cường độ nhúng làm ảnh khó thấy bằng mắt hơn nhưng không qua mặt được bộ dò. Mức Kín đáo (dự phòng 1,
         không dùng hết chỗ trống) là mức khó phát hiện nhất. Đây là một bộ dò cụ thể, công cụ khác có thể nhạy hơn.
-      </p>
+      </p>)}
 
       <h3>Mô hình bảo mật</h3>
       <ul>

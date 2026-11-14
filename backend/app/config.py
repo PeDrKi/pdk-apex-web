@@ -50,6 +50,8 @@ class Settings:
     lockout_fails_per_ip: int = field(default_factory=lambda: _int("LOCKOUT_FAILS_PER_IP", 10))
     lockout_fails_per_user: int = field(default_factory=lambda: _int("LOCKOUT_FAILS_PER_USER", 50))
     # Kiểm tra mật khẩu với kho mật khẩu đã lộ (Have I Been Pwned). Chỉ 5 ký tự đầu của mã băm SHA-1 rời máy chủ.
+    # Hiện "Khả năng bị phát hiện" sau khi giấu tin. Mặc định tắt (bản deploy); các file run-*.bat bật cho bản local.
+    show_detect: bool = field(default_factory=lambda: os.getenv("SHOW_DETECT", "").strip() == "1")
     hibp_check: bool = field(default_factory=lambda: os.getenv("HIBP_CHECK", "1").strip() not in ("0", "false", "no"))
     audit_keep_days: int = field(default_factory=lambda: _int("AUDIT_KEEP_DAYS", 90))
     # Postgres (ví dụ của Supabase). Để trống = SQLite trong DATA_DIR.

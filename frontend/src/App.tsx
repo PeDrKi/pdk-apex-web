@@ -277,7 +277,7 @@ export default function App() {
             onSignedOut={signedOut}
           />
         </div>
-        {tab === "about" && <AboutPanel />}
+        {tab === "about" && <AboutPanel showDetect={health?.detect_enabled ?? false} />}
         {tab === "privacy" && <PrivacyPanel />}
       </main>
 

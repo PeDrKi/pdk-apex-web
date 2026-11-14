@@ -150,6 +150,7 @@ class Health(BaseModel):
     bc7_available: bool
     max_upload_mb: int
     max_redundancy: int
+    detect_enabled: bool = False
 
 
 class CapacityOut(BaseModel):
@@ -226,6 +227,7 @@ def health(db_check: bool = False):
         bc7_available=bc7.is_available(None),
         max_upload_mb=settings.max_upload_mb,
         max_redundancy=settings.max_redundancy,
+        detect_enabled=settings.show_detect,
     )
 
 
@@ -365,10 +367,12 @@ async def embed(
         psnr_db = None if math.isinf(p) else round(p, 2)
         stego_png = to_png_bytes(stego_u8)
         keys_npz = _keys_to_bytes(keys)
-        try:
-            det = detect.analyze(img, stego_u8)
-        except Exception:  # bộ đo chỉ để tham khảo, không được làm hỏng việc giấu tin
-            det = {}
+        det = {}
+        if settings.show_detect:
+            try:
+                det = detect.analyze(img, stego_u8)
+            except Exception:  # bộ đo chỉ để tham khảo, không được làm hỏng việc giấu tin
+                det = {}
 
         # Người đã đăng nhập: lưu luôn vào lịch sử ở đây để trình duyệt khỏi phải tải ảnh lên lần nữa.
         saved_id = save_error = None

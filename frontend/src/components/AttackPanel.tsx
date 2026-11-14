@@ -9,6 +9,7 @@ import {
   type Session,
 } from "../api";
 import { needsServerDecrypt, reveal, type Revealed } from "../lib/codec";
+import { openKeysFile } from "../lib/keyfile";
 import { isZip, unpackBundle } from "../lib/zip";
 import { base64ToBlob, downloadBlob, stem } from "../utils";
 import { Alert } from "./Alert";
@@ -106,8 +107,9 @@ export function AttackPanel({ session }: { session: Session | null }) {
         setRevealed(null);
         setRevealError(null);
         // Nhận dữ liệu thô rồi giải mã tại trình duyệt: mật khẩu không gửi lên máy chủ.
-        let res = await api.attack(image, steps, keys, "", true);
-        if (res.extract && needsServerDecrypt(res.extract)) res = await api.attack(image, steps, keys, password, false);
+        const k = keys && (await openKeysFile(keys, password));
+        let res = await api.attack(image, steps, k, "", true);
+        if (res.extract && needsServerDecrypt(res.extract)) res = await api.attack(image, steps, k, password, false);
         setResult(res);
         if (res.extract) {
           try {
@@ -118,7 +120,7 @@ export function AttackPanel({ session }: { session: Session | null }) {
         }
       } else if (keys) {
         setBattery(null);
-        setBattery(await api.battery(image, keys, level));
+        setBattery(await api.battery(image, await openKeysFile(keys, password), level));
       }
     } catch (e) {
       setError((e as Error).message);
@@ -148,7 +150,7 @@ export function AttackPanel({ session }: { session: Session | null }) {
           <Dropzone
             label="2. File khoá"
             hint="Cần có để thử đọc lại sau khi tấn công"
-            accept=".npz,.zip,application/octet-stream"
+            accept=".npz,.apexkey,.zip,application/octet-stream"
             file={keys}
             onFile={(f) => take(f, "keys")}
           />

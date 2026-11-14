@@ -89,8 +89,8 @@ export function ExtractPanel({ syncAvailable, preset }: Props) {
         />
         <Dropzone
           label="2. File khoá"
-          hint="File .npz tải về lúc giấu tin, hoặc gói .zip"
-          accept=".npz,.zip,application/octet-stream"
+          hint="File .npz hoặc .apexkey tải về lúc giấu tin, hoặc gói .zip"
+          accept=".npz,.apexkey,.zip,application/octet-stream"
           file={keys}
           onFile={(f) => take(f, "keys")}
         />

@@ -10,7 +10,7 @@ BC7) là TUỲ CHỌN — cần AMD CompressonatorCLI; không có vẫn chạy b
 """
 from .core import capacity, embed, extract, load_keys, save_keys
 
-__version__ = "0.2.3"
+__version__ = "1.0.0"
 __all__ = ["embed", "extract", "capacity", "save_keys", "load_keys", "__version__",
            "resync", "extract_robust", "attacks", "evaluate", "bc7"]
 

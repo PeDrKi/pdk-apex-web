@@ -33,6 +33,7 @@ và mở đúng trang web ở những chỗ bạn phải bấm (đăng nhập, d
 | `deploy\4-ket-noi.bat` | Đặt `TRUSTED_ORIGINS` trên Render (qua Render API key, hoặc chỉ chỗ làm tay), đặt `SITE_URL` trên GitHub, kiểm tra cuối |
 | `cap-nhat-web.bat` | Về sau: commit, đẩy lên GitHub (Render tự build) và deploy lại Vercel |
 | `deploy\trang-thai.bat` | Xem các địa chỉ đã deploy và kiểm tra web còn chạy không |
+| `giu-thuc.bat` | Bật/tắt hai việc giữ thức: Render không ngủ (gọi 10 phút một lần) và Supabase không tạm dừng (gọi mỗi ngày). Cần GitHub CLI |
 
 Cần có Git và Node.js; nếu thiếu, script đề nghị cài bằng `winget`. GitHub CLI là tuỳ chọn nhưng nên có.
 Script không lưu mật khẩu hay khoá nào; `deploy\deploy-config.json` chỉ ghi các địa chỉ công khai.
@@ -115,6 +116,18 @@ GitHub tự tắt lịch chạy nếu repo không có thay đổi nào trong 60 
 Nếu dự án Supabase đã bị tạm dừng, vào trang Supabase bấm **Restore project**.
 
 ---
+
+## Giữ Render không ngủ (tuỳ chọn)
+
+Bấm đúp `giu-thuc.bat`, chọn mục 1. Script tạo workflow `.github/workflows/render-awake.yml`, đặt biến `RENDER_URL`
+và bật nó; chọn lại mục 1 để tắt. Chạy thẳng cũng được: `giu-thuc.bat render-on`, `render-off`, `supabase-on`,
+`supabase-off`, `status`.
+
+- Việc gọi do GitHub Actions làm nên không cần máy bạn bật. GitHub hay chạy trễ vài phút khi đông, nên thỉnh thoảng
+  Render vẫn có thể ngủ một lúc. Muốn chắc hơn thì dùng UptimeRobot (miễn phí, 5 phút một lần).
+- Repo **private** chỉ có 2.000 phút Actions miễn phí mỗi tháng, trong khi gọi 10 phút một lần tốn khoảng 4.300 phút.
+  Repo public thì không bị tính. Script sẽ cảnh báo trước khi bật cho repo private.
+- GitHub tự tắt các lịch chạy nếu repo 60 ngày không có thay đổi; chạy lại `giu-thuc.bat` để bật lại.
 
 ## Những giới hạn cần biết
 

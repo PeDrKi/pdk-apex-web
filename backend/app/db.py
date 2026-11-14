@@ -25,8 +25,20 @@ CREATE TABLE IF NOT EXISTS users (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     username    TEXT NOT NULL UNIQUE COLLATE NOCASE,
     pw_hash     TEXT NOT NULL,
-    created_at  INTEGER NOT NULL
+    created_at  INTEGER NOT NULL,
+    recovery_hash TEXT,
+    totp TEXT
 );
+CREATE TABLE IF NOT EXISTS auth_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          INTEGER NOT NULL,
+    user_id     INTEGER,
+    username    TEXT NOT NULL,
+    event       TEXT NOT NULL,
+    ip          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS auth_events_name ON auth_events(username, ts);
+CREATE INDEX IF NOT EXISTS auth_events_user ON auth_events(user_id, ts);
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash  TEXT PRIMARY KEY,
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -46,7 +58,9 @@ CREATE TABLE IF NOT EXISTS items (
     psnr        REAL,
     redundancy  INTEGER NOT NULL,
     stego_bytes INTEGER NOT NULL,
-    keys_bytes  INTEGER NOT NULL
+    keys_bytes  INTEGER NOT NULL,
+    stego_sha256 TEXT,
+    keys_sha256  TEXT
 );
 CREATE INDEX IF NOT EXISTS items_user ON items(user_id, created_at);
 """
@@ -56,8 +70,20 @@ CREATE TABLE IF NOT EXISTS users (
     id          BIGSERIAL PRIMARY KEY,
     username    TEXT NOT NULL,
     pw_hash     TEXT NOT NULL,
-    created_at  BIGINT NOT NULL
+    created_at  BIGINT NOT NULL,
+    recovery_hash TEXT,
+    totp TEXT
 );
+CREATE TABLE IF NOT EXISTS auth_events (
+    id          BIGSERIAL PRIMARY KEY,
+    ts          BIGINT NOT NULL,
+    user_id     BIGINT,
+    username    TEXT NOT NULL,
+    event       TEXT NOT NULL,
+    ip          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS auth_events_name ON auth_events(username, ts);
+CREATE INDEX IF NOT EXISTS auth_events_user ON auth_events(user_id, ts);
 CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower ON users (lower(username));
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash  TEXT PRIMARY KEY,
@@ -82,6 +108,16 @@ CREATE TABLE IF NOT EXISTS items (
 );
 CREATE INDEX IF NOT EXISTS items_user ON items(user_id, created_at);
 """
+
+# Cột thêm sau bản đầu tiên (dấu thời gian chứng minh): tự thêm vào cơ sở dữ liệu cũ khi khởi động.
+_ADDED_COLUMNS = (("items", "stego_sha256"), ("items", "keys_sha256"), ("users", "recovery_hash"), ("users", "totp"))
+# Supabase mở các bảng trong schema public qua REST cho khoá anon/publishable. Bật RLS mà không tạo
+# policy nào thì các khoá đó không đọc được gì; backend nối bằng vai trò chủ bảng nên không bị ảnh hưởng.
+_RLS_TABLES = ("users", "sessions", "items", "auth_events")
+_LATE_INDEXES = (
+    "CREATE INDEX IF NOT EXISTS items_stego_sha ON items(stego_sha256)",
+    "CREATE INDEX IF NOT EXISTS items_keys_sha ON items(keys_sha256)",
+)
 
 _ready = False
 _init_lock = threading.Lock()
@@ -127,12 +163,23 @@ def _init() -> None:
             with _pg_connect() as con:
                 for stmt in filter(str.strip, POSTGRES_SCHEMA.split(";")):
                     con.execute(stmt)
+                for table, col in _ADDED_COLUMNS:  # cơ sở dữ liệu tạo từ bản cũ chưa có các cột này
+                    con.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} TEXT")
+                for table in _RLS_TABLES:
+                    con.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+                for stmt in _LATE_INDEXES:
+                    con.execute(stmt)
         else:
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             con = sqlite3.connect(DB_PATH)
             try:
                 con.execute("PRAGMA journal_mode=WAL")
                 con.executescript(SQLITE_SCHEMA)
+                for table, col in _ADDED_COLUMNS:
+                    if col not in {r[1] for r in con.execute(f"PRAGMA table_info({table})")}:
+                        con.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
+                for stmt in _LATE_INDEXES:
+                    con.execute(stmt)
                 con.commit()
             finally:
                 con.close()

@@ -50,3 +50,16 @@ export function passwordStrength(pw: string): 0 | 1 | 2 | 3 | 4 {
 }
 
 export const nf = new Intl.NumberFormat("vi-VN");
+
+/** Mật khẩu ngẫu nhiên 20 ký tự (khoảng 119 bit), bỏ các ký tự dễ nhầm như 0/O, 1/l. */
+export function randomPassword(length = 20): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789-_";
+  const out: string[] = [];
+  const limit = 256 - (256 % alphabet.length); // bỏ byte gây lệch phân bố
+  while (out.length < length) {
+    for (const b of crypto.getRandomValues(new Uint8Array(length * 2))) {
+      if (b < limit && out.length < length) out.push(alphabet[b % alphabet.length]);
+    }
+  }
+  return out.join("");
+}

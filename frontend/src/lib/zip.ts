@@ -106,7 +106,7 @@ export async function unpackBundle(file: File): Promise<{ image: File | null; ke
   const entries = await readZip(await file.arrayBuffer());
   const base = (n: string) => n.split("/").pop() || n;
   const img = entries.find((e) => IMAGE_EXT.test(e.name));
-  const key = entries.find((e) => /\.npz$/i.test(e.name));
+  const key = entries.find((e) => /\.(npz|apexkey)$/i.test(e.name));
   return {
     image: img ? new File([img.data as BlobPart], base(img.name), { type: "image/png" }) : null,
     keys: key ? new File([key.data as BlobPart], base(key.name)) : null,

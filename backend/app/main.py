@@ -5,6 +5,7 @@ Tài liệu API tự sinh: http://localhost:8000/api/docs
 """
 from __future__ import annotations
 
+import logging
 import base64
 import io
 import math
@@ -24,6 +25,7 @@ from pydantic import BaseModel
 import apexmark
 
 from . import align
+from . import detect
 from . import attacks as atk
 from . import compare as cmp
 from . import logo as logo_mod
@@ -32,6 +34,15 @@ from .config import settings
 from .imaging import ImageError, psnr, read_image, to_png_bytes
 from . import accounts
 from .security import KeysError, SecurityMiddleware, parse_keys
+
+# Log của ứng dụng (nhật ký bảo mật, lỗi kho lưu trữ) ra stdout để xem được trên Render.
+_apex_log = logging.getLogger("apex")
+if not _apex_log.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(levelname)s: [%(name)s] %(message)s"))
+    _apex_log.addHandler(_h)
+    _apex_log.setLevel(logging.INFO)
+    _apex_log.propagate = False
 
 app = FastAPI(
     title="PDK APEX Web API",
@@ -169,6 +180,11 @@ class EmbedOut(BaseModel):
     logo_height: Optional[int] = None
     saved_id: Optional[str] = None
     save_error: Optional[str] = None
+    # Ước lượng khả năng bị phát hiện bởi người biết thuật toán (xem app/detect.py).
+    detect_level: Optional[Literal["low", "medium", "high"]] = None
+    detect_score: Optional[float] = None
+    detect_baseline: Optional[float] = None
+    detect_noise: Optional[float] = None
 
 
 class ExtractOut(BaseModel):
@@ -260,7 +276,7 @@ async def embed(
     logo_header: str = Form(""),
     redundancy: int = Form(5),
     auto_redundancy: bool = Form(False),
-    delta: float = Form(12.0),
+    delta: float = Form(5.0),
     store_thumbnail: bool = Form(True),
     use_aco: bool = Form(True),
     seed: int = Form(0),
@@ -349,6 +365,10 @@ async def embed(
         psnr_db = None if math.isinf(p) else round(p, 2)
         stego_png = to_png_bytes(stego_u8)
         keys_npz = _keys_to_bytes(keys)
+        try:
+            det = detect.analyze(img, stego_u8)
+        except Exception:  # bộ đo chỉ để tham khảo, không được làm hỏng việc giấu tin
+            det = {}
 
         # Người đã đăng nhập: lưu luôn vào lịch sử ở đây để trình duyệt khỏi phải tải ảnh lên lần nữa.
         saved_id = save_error = None
@@ -371,6 +391,8 @@ async def embed(
             encrypted=encrypted, redundancy=red,
             elapsed_ms=int((time.perf_counter() - t0) * 1000),
             kind=kind,
+            detect_level=det.get("level"), detect_score=det.get("score"),
+            detect_baseline=det.get("baseline"), detect_noise=det.get("noise"),
             logo_preview_base64=_b64(to_png_bytes(logo_preview)) if logo_preview is not None else None,
             logo_width=None if header is None else int(header[2]),
             logo_height=None if header is None else int(header[1]),

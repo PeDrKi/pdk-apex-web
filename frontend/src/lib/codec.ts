@@ -1,6 +1,7 @@
 // Cầu nối giữa giao diện và API: đóng gói/mã hoá nội dung trong trình duyệt trước
 // khi gửi, và giải mã kết quả thô nhận về. Máy chủ chỉ thấy dữ liệu đã đóng gói.
 import { api, type EmbedOptions, type EmbedResult, type ExtractParams, type ExtractResult } from "../api";
+import { openKeysFile, sealKeys, SEALED_EXT } from "./keyfile";
 import { decodeLogo, type EncodedLogo, type LogoMode } from "./logo";
 import {
   canEncryptLocally,
@@ -28,6 +29,13 @@ export interface HideResult {
   logo: { url: string; width: number; height: number } | null;
   /** true = mật khẩu/nội dung không rời trình duyệt ở dạng gốc. */
   local: boolean;
+  /** File khoá để tải về hoặc lưu: đã bọc bằng mật khẩu nếu có mật khẩu và trình duyệt mã hoá được. */
+  keys: Uint8Array;
+  keysSealed: boolean;
+  /** Đuôi file khoá: ".npz" hoặc ".apexkey". */
+  keysExt: string;
+  /** File khoá .npz chưa bọc, chỉ dùng trong phiên (thử tấn công, so sánh). */
+  plainKeys: Uint8Array;
 }
 
 export async function hide(p: HideParams): Promise<HideResult> {
@@ -56,7 +64,8 @@ export async function hide(p: HideParams): Promise<HideResult> {
           height: result.logo_height ?? 0,
         }
       : null;
-    return { result, logo, local: false };
+    const plain = b64ToBytes(result.keys_npz_base64);
+    return { result, logo, local: false, keys: plain, keysSealed: false, keysExt: ".npz", plainKeys: plain };
   }
 
   let body: Uint8Array;
@@ -73,8 +82,18 @@ export async function hide(p: HideParams): Promise<HideResult> {
     logo = { url: enc.previewUrl, width: enc.width, height: enc.height };
   }
   const payload = await encodePayload(body, content.kind, password);
-  const result = await api.embedPacked({ ...base, payload, encrypted: !!password, logoHeader });
-  return { result, logo, local: true };
+  // Có mật khẩu: file khoá được bọc tại trình duyệt rồi mới lưu, nên không nhờ máy chủ lưu bản chưa bọc.
+  const result = await api.embedPacked({
+    ...base,
+    save: password ? undefined : base.save,
+    payload,
+    encrypted: !!password,
+    logoHeader,
+  });
+  const plain = b64ToBytes(result.keys_npz_base64);
+  if (!password) return { result, logo, local: true, keys: plain, keysSealed: false, keysExt: ".npz", plainKeys: plain };
+  const keys = await sealKeys(plain, password, { kind: result.kind, redundancy: result.redundancy });
+  return { result, logo, local: true, keys, keysSealed: true, keysExt: SEALED_EXT, plainKeys: plain };
 }
 
 export interface Revealed {
@@ -127,6 +146,7 @@ export const needsServerDecrypt = (r: ExtractResult) => r.encrypted && !canEncry
 export async function extractAndReveal(
   p: Omit<ExtractParams, "raw">,
 ): Promise<{ raw: ExtractResult; revealed: Revealed }> {
+  p = { ...p, keys: await openKeysFile(p.keys, p.password) };
   const raw = await api.extract({ ...p, password: "", raw: true });
   if (needsServerDecrypt(raw)) {
     const full = await api.extract({ ...p, raw: false });

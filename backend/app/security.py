@@ -74,7 +74,7 @@ def _rate_limited(method: str, path: str) -> bool:
     """Giới hạn mọi yêu cầu ghi/xoá và các yêu cầu đọc file lịch sử (tốn băng thông)."""
     if not path.startswith("/api/"):
         return False
-    return method in ("POST", "PUT", "PATCH", "DELETE") or path.startswith("/api/history")
+    return method in ("POST", "PUT", "PATCH", "DELETE") or path.startswith(("/api/history", "/api/proof"))
 
 
 async def _plain(send, status: int, detail: str, extra: list | None = None):

@@ -23,7 +23,14 @@ function logoSide(bytes: number, bitsPerPx: number): string {
 
 /** Bảng cho người dùng biết ảnh này giấu được bao nhiêu ở từng mức bền vững. */
 export function CapacityCard({ cap, redundancy, encrypted }: Props) {
-  const rows: { name: string; redundancy: number }[] = PRESETS.map((p) => ({ name: p.name, redundancy: p.redundancy }));
+  // Các mức có cùng độ dự phòng thì chứa được như nhau: gộp thành một dòng.
+  const rows: { name: string; redundancy: number }[] = [];
+  for (const p of PRESETS) {
+    const same = rows.find((r) => r.redundancy === p.redundancy);
+    const short = p.name.replace(" (mặc định)", "");
+    if (same) same.name += `, ${short}`;
+    else rows.push({ name: short, redundancy: p.redundancy });
+  }
   if (!rows.some((r) => r.redundancy === redundancy)) rows.push({ name: "Tuỳ chỉnh", redundancy });
   rows.sort((a, b) => a.redundancy - b.redundancy);
   const now = maxBytesAt(cap.capacity_bits, redundancy, encrypted);

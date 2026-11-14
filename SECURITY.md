@@ -17,8 +17,8 @@ Ngày rà soát: 13/11/2026. Phạm vi: `backend/app`, `frontend/src`, cách dep
 | 9 | Tham số `seed`, độ dài mật khẩu/thông điệp không bị chặn, gây lỗi 500 | Thấp | Đã vá |
 | 10 | Pillow mở mọi định dạng ảnh, kể cả bộ giải mã ít dùng | Thấp | Đã vá (danh sách cho phép) |
 | 11 | Mật khẩu và nội dung được gửi lên máy chủ để xử lý | Thiết kế | Đã vá: mã hoá tại trình duyệt (Web Crypto). Vẫn cần HTTPS, vì Web Crypto chỉ chạy trên HTTPS/localhost |
-| 12 | Không mật khẩu thì nội dung không được mã hoá; CRC32 không chống giả mạo | Thiết kế | Đã cảnh báo trên giao diện |
-| 13 | File khoá chứa ảnh thu nhỏ của ảnh gốc | Thiết kế | Đã ghi chú, có thể tắt |
+| 12 | Không mật khẩu thì nội dung không được mã hoá; CRC32 không chống giả mạo | Thiết kế | Đã vá: mã hoá là mặc định, muốn bỏ phải tích "Không mã hoá" |
+| 13 | File khoá chứa ảnh thu nhỏ của ảnh gốc | Thiết kế | Đã vá khi có mật khẩu: file khoá được mã hoá tại trình duyệt (`.apexkey`). Không mật khẩu thì vẫn lộ |
 | 14 | Giới hạn tần suất lưu trong bộ nhớ từng tiến trình | Còn lại | Xem mục "Việc nên làm khi deploy" |
 
 ## Chi tiết các bản vá
@@ -62,8 +62,11 @@ Mã nguồn: `backend/app/accounts.py`, `backend/app/db.py`; test: `backend/test
 - **File lưu lên** được kiểm tra như khi đọc tin (ảnh phải là PNG hợp lệ, file khoá qua `validate_keys`); loại nội
   dung, kích thước và độ dự phòng do máy chủ tự rút ra từ file chứ không tin số liệu trình duyệt gửi.
 - **Giới hạn:** 200 mục và 500 MB mỗi tài khoản (chỉnh được).
-- **Những gì được lưu:** ảnh đã giấu tin, file khoá, ảnh thu nhỏ và tên ảnh. **Không lưu** ảnh gốc, nội dung đã giấu
-  ở dạng rõ, và mật khẩu nội dung. Người dùng tắt được việc tự lưu, xoá từng mục, xoá hết, hoặc xoá tài khoản.
+- **Những gì được lưu:** ảnh đã giấu tin, file khoá, ảnh thu nhỏ, tên ảnh và mã băm SHA-256 của hai file (dấu thời
+  gian). **Không lưu** ảnh gốc đủ kích thước và mật khẩu nội dung. Lưu ý: file khoá chứa ảnh thu nhỏ 256 px thang
+  xám của ảnh gốc. Khi người dùng đặt mật khẩu, file khoá được mã hoá AES-256-GCM tại trình duyệt (định dạng
+  `APEXKEY1`, đuôi `.apexkey`) trước khi lưu, nên máy chủ không lưu bản rõ. Không có mật khẩu thì máy chủ lưu file
+  khoá ở dạng rõ, và nội dung đã giấu cũng đọc được. Người dùng tắt được việc tự lưu, xoá từng mục, xoá hết, hoặc xoá tài khoản.
 
 Điểm cần biết:
 
@@ -90,3 +93,36 @@ Mã nguồn: `backend/app/accounts.py`, `backend/app/db.py`; test: `backend/test
 5. Khi có mật khẩu, trình duyệt tự mã hoá (`frontend/src/lib/payload.ts`) và gửi dữ liệu đã đóng gói qua trường `payload`; lúc đọc, máy chủ trả dữ liệu thô (`raw=true`) để trình duyệt giải mã. Nếu trang chạy qua HTTP thường, giao diện báo rõ và chuyển sang nhờ máy chủ mã hoá.
 6. Tên file nhúng trong ảnh là dữ liệu không tin cậy: giao diện loại bỏ ký tự đường dẫn trước khi cho tải về.
 7. Giới hạn tần suất mặc định là 60 request POST mỗi phút cho mỗi IP.
+
+## Bổ sung ngày 13/11/2026 (đợt 2)
+
+- **Băm mật khẩu có hàng đợi:** tối đa `MAX_PASSWORD_JOBS` (mặc định 2) lần băm scrypt chạy cùng lúc, mỗi lần khoảng
+  32 MB, nên nhiều yêu cầu đăng nhập đồng thời không làm máy 512 MB hết bộ nhớ.
+- **Khoá đăng nhập sai lưu trong cơ sở dữ liệu:** 10 lần sai từ cùng một IP với cùng một tên trong 15 phút thì bị khoá
+  tạm; 50 lần sai với một tên từ mọi IP cũng bị khoá. Không mất khi máy chủ khởi động lại. Giới hạn tần suất chung
+  vẫn nằm trong bộ nhớ.
+- **RLS trên Supabase:** bật Row Level Security cho `users`, `sessions`, `items`, `auth_events` và không tạo policy
+  nào, nên khoá anon/publishable không đọc được các bảng này qua REST. Backend nối bằng vai trò chủ bảng nên không bị
+  ảnh hưởng. Khoá `service_role` vẫn toàn quyền và chỉ được nằm trên Render.
+- **Mật khẩu yếu bị từ chối:** danh sách mật khẩu phổ biến, dãy phím, chỉ chữ số dưới 12 ký tự, tên đăng nhập thêm
+  số. Chưa kiểm tra với kho mật khẩu đã lộ.
+- **Mã khôi phục:** cấp một lần lúc đăng ký (khoảng 100 bit), máy chủ chỉ lưu SHA-256. Dùng xong thì đổi mã mới và
+  đăng xuất mọi thiết bị.
+- **Nhật ký bảo mật:** bảng `auth_events` ghi đăng ký, đăng nhập đúng/sai, đăng xuất, đổi mật khẩu, khôi phục, xoá
+  lịch sử, kèm IP, giữ 90 ngày, xoá cùng tài khoản. Người dùng xem được 30 mục gần nhất của mình.
+- **Xác thực hai lớp (2FA):** TOTP theo RFC 6238 (ứng dụng Authenticator). Bật trong Cài đặt tài khoản sau khi xác
+  nhận một mã; mã đã dùng không dùng lại được; nhập sai tính vào bộ đếm khoá tạm. Mã khôi phục đặt lại mật khẩu và
+  tắt 2FA (lối thoát khi mất điện thoại). Khoá TOTP lưu ở dạng rõ trong cơ sở dữ liệu vì máy chủ cần nó để kiểm tra.
+- **Hàng loạt:** cũng bắt buộc mật khẩu, trừ khi tích "Không mã hoá".
+- **Chưa làm:** chặn giả `x-forwarded-for` khi gọi thẳng địa chỉ `onrender.com`.
+
+## Bổ sung ngày 14/11/2026
+
+- **Bộ đo khả năng bị phát hiện** (`backend/app/detect.py`): sau mỗi lần giấu tin, máy chủ đóng vai người biết thuật
+  toán nhưng không có khoá, đo mức các khối 4×4 dồn về lưới QIM với từng giá trị delta nguyên 4..48, rồi so với ảnh
+  gốc. Kết quả (thấp / trung bình / cao) hiện cùng PSNR. Dấu vết tỉ lệ với số khối bị đụng tới; giảm delta không
+  giấu được dấu vết này. Đây là một bộ dò cụ thể, không phải cam kết với mọi công cụ steganalysis.
+- **Mức nhúng:** thêm mức Kín đáo (dự phòng 1, delta 5, không dùng hết chỗ trống). Mặc định mới là Nhẹ: dự phòng 5,
+  delta 5, không dùng hết chỗ trống (PSNR khoảng 50 dB; kém bền hơn mức Cân bằng trước đây).
+- **Mật khẩu đã lộ:** khi đăng ký, đổi mật khẩu, khôi phục, máy chủ hỏi Have I Been Pwned theo k-anonymity (chỉ gửi 5
+  ký tự đầu của SHA-1). Không gọi được thì bỏ qua. Tắt bằng `HIBP_CHECK=0`.

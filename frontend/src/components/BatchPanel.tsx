@@ -3,7 +3,7 @@ import { ApiError } from "../api";
 import { hide } from "../lib/codec";
 import type { NewEntry } from "../lib/history";
 import { canEncryptLocally } from "../lib/payload";
-import { PRESETS } from "../lib/presets";
+import { DEFAULT_PRESET, PRESETS } from "../lib/presets";
 import { writeZip, type ZipEntry } from "../lib/zip";
 import { base64ToBytes, downloadBlob, formatBytes, stem } from "../utils";
 import { Alert } from "./Alert";
@@ -46,7 +46,8 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
   const [template, setTemplate] = useState("© PDK 2026 · {ten} · #{stt}");
   const [perLine, setPerLine] = useState(false);
   const [password, setPassword] = useState("");
-  const [presetId, setPresetId] = useState<(typeof PRESETS)[number]["id"]>("robust");
+  const [noEncrypt, setNoEncrypt] = useState(false);
+  const [presetId, setPresetId] = useState<(typeof PRESETS)[number]["id"]>(DEFAULT_PRESET.id);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +94,7 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
       update(i, { state: "run", note: "" });
       try {
         const wait = (s: number) => update(i, { note: `Máy chủ đang bận, thử lại sau ${s} giây` });
-        const { result } = await withRetry(
+        const done = await withRetry(
           () =>
             hide({
               image: file,
@@ -101,19 +102,20 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
               password,
               redundancy: preset.redundancy,
               save: save ? { name: stem(file.name) } : undefined,
-              autoRedundancy: true,
+              autoRedundancy: preset.auto,
               delta: preset.delta,
               storeThumbnail: true,
               useAco: true,
             }),
           wait,
         );
+        const { result } = done;
         let base = stem(file.name);
         for (let n = 2; names.has(base); n++) base = `${stem(file.name)}_${n}`;
         names.add(base);
         const stegoBytes = base64ToBytes(result.stego_png_base64);
-        const keysBytes = base64ToBytes(result.keys_npz_base64);
-        entries.push({ name: `${base}_apex.png`, data: stegoBytes }, { name: `khoa/${base}_khoa.npz`, data: keysBytes });
+        const keysBytes = done.keys;
+        entries.push({ name: `${base}_apex.png`, data: stegoBytes }, { name: `khoa/${base}_khoa${done.keysExt}`, data: keysBytes });
         // Chờ lưu xong mới sang ảnh kế tiếp để không dồn yêu cầu lên máy chủ.
         await onResult({
           name: base,
@@ -202,8 +204,24 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
             </select>
           </label>
           <div className="field">
-            <label className="field-label" htmlFor="bpw">Mật khẩu chung (tuỳ chọn)</label>
-            <input id="bpw" type="password" value={password} autoComplete="new-password" onChange={(e) => setPassword(e.target.value)} />
+            <label className="field-label" htmlFor="bpw">Mật khẩu chung (mã hoá cả nội dung và file khoá)</label>
+            <input id="bpw" type="password" value={password} autoComplete="new-password" disabled={noEncrypt} onChange={(e) => setPassword(e.target.value)} />
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={noEncrypt}
+                onChange={(e) => {
+                  setNoEncrypt(e.target.checked);
+                  if (e.target.checked) setPassword("");
+                }}
+              />
+              Không mã hoá (không khuyên dùng)
+            </label>
+            {noEncrypt && (
+              <span className="small text-danger">
+                Ai có ảnh và file khoá đều đọc được nội dung; file khoá còn chứa ảnh thu nhỏ của ảnh gốc.
+              </span>
+            )}
             {password && !canEncryptLocally() && (
               <span className="muted small">Trang đang chạy qua HTTP nên mật khẩu sẽ được gửi lên máy chủ để mã hoá.</span>
             )}
@@ -218,7 +236,7 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
       {error && <Alert kind="error">{error}</Alert>}
 
       <div className="actions">
-        <button type="button" className="btn btn-primary" disabled={!files.length || !template.trim() || busy} onClick={run}>
+        <button type="button" className="btn btn-primary" disabled={!files.length || !template.trim() || busy || (!password && !noEncrypt)} onClick={run}>
           {busy && <span className="spinner" aria-hidden="true" />}
           {busy ? `Đang giấu ${done + failed + 1}/${rows.length}…` : `Giấu tin vào ${files.length || ""} ảnh`}
         </button>

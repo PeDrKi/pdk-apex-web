@@ -3,6 +3,7 @@ import os
 import sys
 
 os.environ.setdefault("RATE_LIMIT_PER_MIN", "0")
+os.environ.setdefault("HIBP_CHECK", "0")  # test không gọi ra mạng
 os.environ.setdefault("LOGIN_ATTEMPTS_PER_MIN", "0")
 import tempfile
 

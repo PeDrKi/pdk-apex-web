@@ -43,6 +43,15 @@ class Settings:
     max_storage_mb_per_user: int = field(default_factory=lambda: _int("MAX_STORAGE_MB_PER_USER", 500))
     # Số lần thử đăng nhập/đăng ký mỗi phút cho mỗi IP và mỗi tên đăng nhập (0 = tắt).
     login_attempts_per_min: int = field(default_factory=lambda: _int("LOGIN_ATTEMPTS_PER_MIN", 10))
+    # Mỗi lần băm scrypt tốn khoảng 32 MB: chỉ cho vài lần chạy cùng lúc để máy ít RAM không sập.
+    max_password_jobs: int = field(default_factory=lambda: max(1, _int("MAX_PASSWORD_JOBS", 2)))
+    # Khoá tạm khi đăng nhập sai nhiều lần (đếm trong cơ sở dữ liệu, không mất khi khởi động lại).
+    lockout_window_min: int = field(default_factory=lambda: _int("LOCKOUT_WINDOW_MIN", 15))
+    lockout_fails_per_ip: int = field(default_factory=lambda: _int("LOCKOUT_FAILS_PER_IP", 10))
+    lockout_fails_per_user: int = field(default_factory=lambda: _int("LOCKOUT_FAILS_PER_USER", 50))
+    # Kiểm tra mật khẩu với kho mật khẩu đã lộ (Have I Been Pwned). Chỉ 5 ký tự đầu của mã băm SHA-1 rời máy chủ.
+    hibp_check: bool = field(default_factory=lambda: os.getenv("HIBP_CHECK", "1").strip() not in ("0", "false", "no"))
+    audit_keep_days: int = field(default_factory=lambda: _int("AUDIT_KEEP_DAYS", 90))
     # Postgres (ví dụ của Supabase). Để trống = SQLite trong DATA_DIR.
     database_url: str = field(default_factory=lambda: os.environ.get("DATABASE_URL", ""))
     # Supabase Storage cho file lịch sử. Để trống = lưu trong DATA_DIR/files.

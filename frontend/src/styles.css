@@ -132,8 +132,9 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .strength[data-level="4"] i:nth-child(-n+4) { background: var(--primary); }
 
 /* ---------- presets / segmented ---------- */
-.presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-@media (max-width: 720px) { .presets { grid-template-columns: 1fr; } }
+.presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 900px) { .presets { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .presets { grid-template-columns: 1fr; } }
 .preset { border: 1px solid var(--border); background: var(--bg); border-radius: var(--radius); padding: 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; transition: border-color .15s; }
 .preset:hover { border-color: var(--border-strong); }
 .preset input { position: absolute; opacity: 0; pointer-events: none; }

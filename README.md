@@ -1,6 +1,6 @@
 # PDK APEX Web
 
-Web giấu thông điệp vào ảnh (steganography / watermark), dựa trên thư viện **apexmark 0.2.3**
+Web giấu thông điệp vào ảnh (steganography / watermark), dựa trên thư viện **apexmark 1.0.0**
 (ACO + Adaptive Block-Mean QIM + N-GDC, bền vững với nén).
 
 - **Frontend:** React 18 + Vite 6 + TypeScript (`frontend/`)
@@ -158,7 +158,7 @@ backend/
   app/compare.py     so sánh ảnh trước/sau
   app/logo.py        chuyển logo <-> bytes
   app/imaging.py     đọc/ghi ảnh, PSNR
-  apexmark/          thư viện apexmark 0.2.3 (MIT)
+  apexmark/          thư viện apexmark 1.0.0 (MIT)
   tests/             test API (pytest)
 frontend/
   src/App.tsx        khung trang, tab

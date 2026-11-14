@@ -36,7 +36,7 @@ function concat(...parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
-async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+export async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
     { name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations: KDF_ITERATIONS },

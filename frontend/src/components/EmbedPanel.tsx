@@ -4,9 +4,9 @@ import { hide, type Content, type HideResult } from "../lib/codec";
 import { DEFAULT_EDIT, encodeLogo, loadLogo, type EncodedLogo, type LogoEdit, type LogoInvert, type LogoMode } from "../lib/logo";
 import { canEncryptLocally, overhead } from "../lib/payload";
 import type { NewEntry } from "../lib/history";
-import { PRESETS, type PresetId } from "../lib/presets";
+import { DEFAULT_PRESET, PRESETS, PSNR_WARN, type PresetId } from "../lib/presets";
 import { writeZip } from "../lib/zip";
-import { base64ToBlob, base64ToBytes, downloadBlob, formatBytes, nf, passwordStrength, stem, utf8Length } from "../utils";
+import { base64ToBlob, downloadBlob, formatBytes, nf, passwordStrength, randomPassword, stem, utf8Length } from "../utils";
 import { Alert } from "./Alert";
 import { CapacityCard, maxBytesAt } from "./CapacityCard";
 import { LogoEditor } from "./LogoEditor";
@@ -20,6 +20,8 @@ interface Props {
   saveToAccount: boolean;
   onSend: (target: "attack" | "compare", s: Session) => void;
 }
+
+const DETECT = { low: "THẤP", medium: "TRUNG BÌNH", high: "CAO" } as const;
 
 const KINDS: { id: PayloadKind; label: string }[] = [
   { id: "text", label: "Chữ" },
@@ -49,10 +51,11 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
   const [secretFile, setSecretFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [preset, setPreset] = useState<PresetId>("balanced");
-  const [redundancy, setRedundancy] = useState(5);
-  const [delta, setDelta] = useState(16);
-  const [autoRedundancy, setAutoRedundancy] = useState(true);
+  const [noEncrypt, setNoEncrypt] = useState(false);
+  const [preset, setPreset] = useState<PresetId>(DEFAULT_PRESET.id);
+  const [redundancy, setRedundancy] = useState<number>(DEFAULT_PRESET.redundancy);
+  const [delta, setDelta] = useState<number>(DEFAULT_PRESET.delta);
+  const [autoRedundancy, setAutoRedundancy] = useState<boolean>(DEFAULT_PRESET.auto);
   const [storeThumbnail, setStoreThumbnail] = useState(true);
   const [useAco, setUseAco] = useState(true);
   const [advanced, setAdvanced] = useState(false);
@@ -134,7 +137,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
   const over = kind !== "logo" && maxBytes !== null && used > maxBytes;
   const pct = maxBytes ? Math.min(100, (used / Math.max(1, maxBytes)) * 100) : 0;
   const hasContent = kind === "text" ? !!message : kind === "logo" ? !!logoEnc.enc : !!secretFile;
-  const ready = !!image && !!cap && hasContent && !over;
+  const ready = !!image && !!cap && hasContent && !over && (!!password || noEncrypt);
   const local = canEncryptLocally();
 
   const result = out?.result ?? null;
@@ -150,6 +153,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
     if (p) {
       setRedundancy(p.redundancy);
       setDelta(p.delta);
+      setAutoRedundancy(p.auto);
     }
   }
 
@@ -182,7 +186,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
       onResult({
         name: stem(image.name),
         stego: base64ToBlob(r.stego_png_base64, "image/png"),
-        keys: new Blob([base64ToBytes(r.keys_npz_base64) as BlobPart]),
+        keys: new Blob([done.keys as BlobPart]),
         kind: r.kind,
         encrypted: r.encrypted,
         width: r.width,
@@ -201,14 +205,14 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
 
   const base = image ? stem(image.name) : "anh";
   const stegoName = `${base}_apex.png`;
-  const keysName = `${base}_khoa.npz`;
+  const keysName = `${base}_khoa${out?.keysExt ?? ".npz"}`;
 
   async function downloadZip() {
     if (!result || !stegoBlob) return;
     downloadBlob(
       writeZip([
         { name: stegoName, data: new Uint8Array(await stegoBlob.arrayBuffer()) },
-        { name: keysName, data: base64ToBytes(result.keys_npz_base64) },
+        { name: keysName, data: out!.keys },
       ]),
       `${base}_apex.zip`,
     );
@@ -219,7 +223,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
     onSend(target, {
       original: image,
       stego: new File([stegoBlob], stegoName, { type: "image/png" }),
-      keys: new File([base64ToBytes(result.keys_npz_base64) as BlobPart], keysName),
+      keys: new File([out!.plainKeys as BlobPart], `${base}_khoa.npz`),
       password,
     });
   }
@@ -336,11 +340,23 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
           )}
 
           <div className="field">
-            <label className="field-label" htmlFor="pw">Mật khẩu (tuỳ chọn)</label>
+            <label className="field-label" htmlFor="pw">Mật khẩu mã hoá</label>
             <div className="input-group">
-              <input id="pw" type={showPw ? "text" : "password"} value={password} autoComplete="new-password" placeholder="Để trống nếu không cần mã hoá" onChange={(e) => setPassword(e.target.value)} />
+              <input id="pw" type={showPw ? "text" : "password"} value={password} autoComplete="new-password" placeholder="Mật khẩu để mã hoá nội dung và file khoá" disabled={noEncrypt} onChange={(e) => setPassword(e.target.value)} />
               <button type="button" className="btn btn-ghost" onClick={() => setShowPw((v) => !v)}>
                 {showPw ? "Ẩn" : "Hiện"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={noEncrypt}
+                title="Tạo mật khẩu ngẫu nhiên 20 ký tự"
+                onClick={() => {
+                  setPassword(randomPassword());
+                  setShowPw(true);
+                }}
+              >
+                Tạo
               </button>
             </div>
             {password ? (
@@ -351,15 +367,28 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
                 </div>
                 <span className="muted small">
                   {local
-                    ? "Nội dung được mã hoá AES-256 ngay trong trình duyệt. Mật khẩu không được gửi lên máy chủ."
+                    ? "Nội dung và file khoá được mã hoá AES-256 ngay trong trình duyệt. Mật khẩu không được gửi lên máy chủ. Quên mật khẩu thì không ai khôi phục được."
                     : "Trang đang chạy qua HTTP nên trình duyệt không mã hoá được: mật khẩu sẽ được gửi lên máy chủ để mã hoá. Hãy dùng HTTPS."}
                 </span>
               </>
             ) : (
-              <span className="muted small">
-                Không có mật khẩu: ai có ảnh và file khoá đều đọc được. Có mật khẩu: nội dung được mã hoá AES-256.
+              <span className={`small ${noEncrypt ? "text-danger" : "muted"}`}>
+                {noEncrypt
+                  ? "Không mã hoá: ai có ảnh và file khoá đều đọc được nội dung, và máy chủ cũng thấy nội dung. File khoá còn chứa ảnh thu nhỏ của ảnh gốc."
+                  : "Nhập mật khẩu, hoặc bấm Tạo để có mật khẩu ngẫu nhiên. Nội dung và file khoá sẽ được mã hoá AES-256."}
               </span>
             )}
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={noEncrypt}
+                onChange={(e) => {
+                  setNoEncrypt(e.target.checked);
+                  if (e.target.checked) setPassword("");
+                }}
+              />
+              Không mã hoá (không khuyên dùng)
+            </label>
           </div>
         </div>
       </div>
@@ -377,7 +406,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
         </div>
         <label className="check">
           <input type="checkbox" checked={autoRedundancy} onChange={(e) => setAutoRedundancy(e.target.checked)} />
-          Dùng hết chỗ trống của ảnh để lặp lại nội dung (bền hơn, ảnh đổi nhiều điểm hơn)
+          Dùng hết chỗ trống của ảnh để lặp lại nội dung (bền hơn nhiều, nhưng dễ bị phát hiện hơn)
         </label>
         <button type="button" className="link-btn" onClick={() => setAdvanced((v) => !v)}>
           {advanced ? "Ẩn tuỳ chọn nâng cao" : "Tuỳ chọn nâng cao"}
@@ -467,6 +496,12 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
               <dt>Đã dùng</dt>
               <dd>{(result.usage_ratio * 100).toFixed(1)}%</dd>
             </div>
+            {result.detect_level && (
+              <div>
+                <dt>Khả năng bị phát hiện</dt>
+                <dd className={result.detect_level === "low" ? "" : "text-danger"}>{DETECT[result.detect_level]}</dd>
+              </div>
+            )}
             <div>
               <dt>Mã hoá</dt>
               <dd>{result.encrypted ? (out.local ? "AES · TẠI MÁY" : "AES-256") : "KHÔNG"}</dd>
@@ -479,8 +514,8 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
             <button type="button" className="btn" onClick={() => downloadBlob(stegoBlob, stegoName)}>
               Chỉ ảnh (.png)
             </button>
-            <button type="button" className="btn" onClick={() => downloadBlob(new Blob([base64ToBytes(result.keys_npz_base64) as BlobPart]), keysName)}>
-              Chỉ khoá (.npz · {formatBytes(Math.floor((result.keys_npz_base64.length * 3) / 4))})
+            <button type="button" className="btn" onClick={() => downloadBlob(new Blob([out.keys as BlobPart]), keysName)}>
+              Chỉ khoá ({out.keysExt} · {formatBytes(out.keys.length)})
             </button>
           </div>
           <div className="actions">
@@ -491,6 +526,33 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
               Thử tấn công ảnh này
             </button>
           </div>
+          {result.psnr_db !== null && result.psnr_db < PSNR_WARN && (
+            <Alert kind="warn">
+              PSNR {result.psnr_db.toFixed(1)} dB là thấp (dưới {PSNR_WARN} dB): nhiễu có thể nhìn thấy bằng mắt và ảnh dễ
+              bị công cụ phân tích phát hiện là có giấu tin. Nếu cần kín đáo hơn, hãy chọn mức bền vững thấp hơn, bỏ
+              tuỳ chọn "Dùng hết chỗ trống", hoặc giảm cường độ nhúng.
+            </Alert>
+          )}
+          {result.detect_level && result.detect_score != null && (
+            <Alert kind={result.detect_level === "low" ? "ok" : "warn"}>
+              <strong>Khả năng bị phát hiện: {DETECT[result.detect_level].toLowerCase()}.</strong>{" "}
+              {result.detect_level === "low"
+                ? "Bộ dò biết thuật toán APEX không phân biệt được ảnh này với ảnh thường."
+                : result.detect_level === "medium"
+                  ? "Bộ dò biết thuật toán APEX nhận ra dấu vết yếu trong ảnh này."
+                  : "Bộ dò biết thuật toán APEX nhận ra rõ ảnh này có giấu tin."}{" "}
+              Dấu vết đo được {(result.detect_score * 100).toFixed(1)}% (ảnh gốc {((result.detect_baseline ?? 0) * 100).toFixed(1)}%,
+              ngưỡng nhiễu {((result.detect_noise ?? 0) * 100).toFixed(1)}%).
+              {result.detect_level !== "low" &&
+                " Muốn kín hơn: chọn mức Kín đáo, bỏ \"Dùng hết chỗ trống\", rút ngắn nội dung hoặc dùng ảnh lớn hơn."}
+            </Alert>
+          )}
+          {out.keysSealed && (
+            <Alert kind="ok">
+              File khoá <code>{out.keysExt}</code> đã được mã hoá bằng mật khẩu của bạn. Khi đọc tin cần cả ảnh, file
+              khoá và mật khẩu.
+            </Alert>
+          )}
           <Alert kind="warn">
             Hãy giữ <strong>file khoá</strong> cẩn thận: thiếu nó thì không đọc lại được nội dung đã giấu. Khi gửi cho
             người khác, nên gửi ảnh và khoá qua hai kênh riêng. Nên chia sẻ ảnh ở dạng PNG.

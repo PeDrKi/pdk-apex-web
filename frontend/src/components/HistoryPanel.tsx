@@ -1,9 +1,13 @@
-import { type FormEvent, useState } from "react";
-import { api, type HistoryItem, type HistoryList, type PayloadKind, type User } from "../api";
+import qrcode from "qrcode-generator";
+import { type FormEvent, useEffect, useState } from "react";
+import { api, type AuthEvent, type HistoryItem, type HistoryList, type PayloadKind, type User } from "../api";
 import type { LocalEntry } from "../lib/history";
+import { isSealed, SEALED_EXT } from "../lib/keyfile";
 import { writeZip } from "../lib/zip";
 import { downloadBlob, formatBytes } from "../utils";
 import { Alert } from "./Alert";
+import type { AuthMode } from "./AuthDialog";
+import { ProofCheck } from "./ProofCheck";
 
 interface Props {
   user: User | null;
@@ -12,7 +16,7 @@ interface Props {
   remoteError: string | null;
   autoSave: boolean;
   onAutoSave: (on: boolean) => void;
-  onLogin: (mode: "login" | "register") => void;
+  onLogin: (mode: AuthMode) => void;
   onSaveLocal: () => Promise<void>;
   onDeleteLocal: (id: string) => void;
   onRemoteChanged: () => Promise<void>;
@@ -108,11 +112,15 @@ export function HistoryPanel(p: Props) {
     }
   }
 
-  const names = (r: Row) => ({ stego: `${r.name}_apex.png`, keys: `${r.name}_khoa.npz` });
+  /** File khoá đã bọc mật khẩu mang đuôi .apexkey; nhận biết qua mấy byte đầu. */
+  const names = async (r: Row, keys: Blob) => ({
+    stego: `${r.name}_apex.png`,
+    keys: `${r.name}_khoa${isSealed(new Uint8Array(await keys.slice(0, 64).arrayBuffer())) ? SEALED_EXT : ".npz"}`,
+  });
 
   async function zip(r: Row) {
     const f = await r.files();
-    const n = names(r);
+    const n = await names(r, f.keys);
     downloadBlob(
       writeZip([
         { name: n.stego, data: new Uint8Array(await f.stego.arrayBuffer()) },
@@ -124,7 +132,7 @@ export function HistoryPanel(p: Props) {
 
   async function open(r: Row) {
     const f = await r.files();
-    const n = names(r);
+    const n = await names(r, f.keys);
     p.onOpenExtract(new File([f.stego], n.stego, { type: "image/png" }), new File([f.keys], n.keys));
   }
 
@@ -163,7 +171,7 @@ export function HistoryPanel(p: Props) {
       {p.user && (
         <label className="check">
           <input type="checkbox" checked={p.autoSave} onChange={(e) => p.onAutoSave(e.target.checked)} />
-          Tự lưu vào tài khoản mỗi lần giấu tin (ảnh đã giấu tin và file khoá; không lưu ảnh gốc và mật khẩu)
+          Tự lưu vào tài khoản mỗi lần giấu tin (ảnh đã giấu tin và file khoá; không lưu mật khẩu. File khoá chứa ảnh thu nhỏ của ảnh gốc, và chỉ được mã hoá khi bạn đặt mật khẩu)
         </label>
       )}
 
@@ -247,13 +255,74 @@ export function HistoryPanel(p: Props) {
         </div>
       )}
 
-      {p.user && <AccountSettings onSignedOut={p.onSignedOut} />}
+      <ProofCheck />
+
+      {p.user && <AccountSettings onSignedOut={p.onSignedOut} hasRecovery={!!p.user.has_recovery} has2fa={!!p.user.has_2fa} />}
     </div>
   );
 }
 
-function AccountSettings({ onSignedOut }: { onSignedOut: () => void }) {
+const eventFmt = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "medium" });
+
+function qrDataUrl(text: string): string {
+  const qr = qrcode(0, "M");
+  qr.addData(text);
+  qr.make();
+  return qr.createDataURL(5, 10);
+}
+
+function AccountSettings({ onSignedOut, hasRecovery, has2fa }: { onSignedOut: () => void; hasRecovery: boolean; has2fa: boolean }) {
+  const [twoFa, setTwoFa] = useState(has2fa);
+  const [tfPw, setTfPw] = useState("");
+  const [tfSetup, setTfSetup] = useState<{ secret: string; uri: string } | null>(null);
+  const [tfCode, setTfCode] = useState("");
+
+  function twoFaStart(e: FormEvent) {
+    e.preventDefault();
+    void run(async () => {
+      if (twoFa) {
+        await api.twoFaDisable(tfPw);
+        setTwoFa(false);
+        setMsg({ kind: "ok", text: "Đã tắt xác thực hai lớp." });
+      } else {
+        setTfSetup(await api.twoFaSetup(tfPw));
+      }
+      setTfPw("");
+    });
+  }
+
+  function twoFaConfirm(e: FormEvent) {
+    e.preventDefault();
+    void run(async () => {
+      await api.twoFaEnable(tfCode);
+      setTwoFa(true);
+      setTfSetup(null);
+      setTfCode("");
+      setMsg({ kind: "ok", text: "Đã bật xác thực hai lớp. Từ lần đăng nhập sau sẽ cần mã 6 số." });
+    });
+  }
+
   const [open, setOpen] = useState(false);
+  const [rcPw, setRcPw] = useState("");
+  const [newCode, setNewCode] = useState<string | null>(null);
+  const [hasCode, setHasCode] = useState(hasRecovery);
+  const [events, setEvents] = useState<AuthEvent[] | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    api.activity().then(setEvents, () => setEvents([]));
+  }, [open]);
+
+  function recoveryCode(e: FormEvent) {
+    e.preventDefault();
+    void run(async () => {
+      const u = await api.newRecoveryCode(rcPw);
+      setRcPw("");
+      setNewCode(u.recovery_code ?? null);
+      setHasCode(true);
+    });
+  }
+
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [delPw, setDelPw] = useState("");
@@ -292,6 +361,12 @@ function AccountSettings({ onSignedOut }: { onSignedOut: () => void }) {
 
   return (
     <div className="stack">
+      {!hasCode && (
+        <Alert kind="warn">
+          Tài khoản này chưa có <strong>mã khôi phục</strong>: quên mật khẩu là mất tài khoản. Mở Cài đặt tài khoản để
+          tạo mã.
+        </Alert>
+      )}
       <button type="button" className="link-btn" onClick={() => setOpen((v) => !v)}>
         {open ? "Ẩn cài đặt tài khoản" : "Cài đặt tài khoản"}
       </button>
@@ -306,6 +381,70 @@ function AccountSettings({ onSignedOut }: { onSignedOut: () => void }) {
               <button className="btn btn-sm" disabled={busy || !current || next.length < 8}>Đổi mật khẩu</button>
             </div>
           </form>
+          {tfSetup ? (
+            <form className="stack" onSubmit={twoFaConfirm}>
+              <span className="field-label">Xác thực hai lớp: quét mã</span>
+              <span className="muted small">
+                Mở Google Authenticator, Microsoft Authenticator hoặc ứng dụng tương tự, quét mã QR này (hoặc nhập khoá
+                bên dưới), rồi nhập mã 6 số ứng dụng hiện ra để hoàn tất.
+              </span>
+              <img src={qrDataUrl(tfSetup.uri)} alt="Mã QR để thêm vào ứng dụng xác thực" width={200} height={200} style={{ background: "#fff", borderRadius: 6 }} />
+              <pre className="message" style={{ userSelect: "all", wordBreak: "break-all", whiteSpace: "pre-wrap" }}>{tfSetup.secret.replace(/(.{4})/g, "$1 ").trim()}</pre>
+              <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={7} placeholder="Mã 6 số" value={tfCode} onChange={(e) => setTfCode(e.target.value.replace(/[^0-9 ]/g, ""))} />
+              <div className="actions">
+                <button className="btn btn-sm btn-primary" disabled={busy || tfCode.replace(/ /g, "").length !== 6}>Bật xác thực hai lớp</button>
+                <button type="button" className="btn btn-sm" onClick={() => setTfSetup(null)}>Huỷ</button>
+              </div>
+            </form>
+          ) : (
+            <form className="stack" onSubmit={twoFaStart}>
+              <span className="field-label">Xác thực hai lớp (2FA): {twoFa ? "đang bật" : "đang tắt"}</span>
+              <span className="muted small">
+                {twoFa
+                  ? "Đăng nhập cần thêm mã 6 số từ ứng dụng xác thực. Mất điện thoại thì dùng mã khôi phục để vào lại."
+                  : "Khi bật, đăng nhập cần thêm mã 6 số từ ứng dụng trên điện thoại, nên lộ mật khẩu cũng chưa mất tài khoản. Hãy có mã khôi phục trước khi bật."}
+              </span>
+              <input type="password" placeholder="Nhập mật khẩu để xác nhận" autoComplete="current-password" value={tfPw} onChange={(e) => setTfPw(e.target.value)} />
+              <div className="actions">
+                <button className={`btn btn-sm${twoFa ? " btn-danger" : ""}`} disabled={busy || !tfPw}>{twoFa ? "Tắt xác thực hai lớp" : "Cài xác thực hai lớp"}</button>
+              </div>
+            </form>
+          )}
+          <form className="stack" onSubmit={recoveryCode}>
+            <span className="field-label">Mã khôi phục</span>
+            <span className="muted small">
+              Dùng để đặt lại mật khẩu khi quên. Tạo mã mới thì mã cũ hết hiệu lực. Mã chỉ hiện một lần.
+            </span>
+            {newCode && (
+              <>
+                <pre className="message" style={{ textAlign: "center", userSelect: "all" }}>{newCode}</pre>
+                <span className="small text-danger">Hãy chép mã này ngay, đóng trang là không xem lại được.</span>
+              </>
+            )}
+            <input type="password" placeholder="Nhập mật khẩu để xác nhận" autoComplete="current-password" value={rcPw} onChange={(e) => setRcPw(e.target.value)} />
+            <div className="actions">
+              <button className="btn btn-sm" disabled={busy || !rcPw}>{hasCode ? "Tạo mã khôi phục mới" : "Tạo mã khôi phục"}</button>
+            </div>
+          </form>
+          <div className="stack">
+            <span className="field-label">Hoạt động gần đây</span>
+            <span className="muted small">
+              Đăng nhập, đổi mật khẩu và các thao tác quan trọng trong 90 ngày. Thấy mục lạ thì đổi mật khẩu ngay.
+            </span>
+            {events === null ? (
+              <span className="muted small">Đang tải…</span>
+            ) : events.length === 0 ? (
+              <span className="muted small">Chưa có hoạt động nào được ghi.</span>
+            ) : (
+              <ul className="muted small" style={{ margin: 0, paddingLeft: 18 }}>
+                {events.map((ev, i) => (
+                  <li key={i} className={ev.event.endsWith("_fail") ? "text-danger" : ""}>
+                    {eventFmt.format(new Date(ev.ts * 1000))} · {ev.label} · {ev.ip}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <form className="stack" onSubmit={remove}>
             <span className="field-label">Xoá tài khoản</span>
             <span className="muted small">Xoá vĩnh viễn tài khoản cùng toàn bộ ảnh và khoá đã lưu trên máy chủ.</span>

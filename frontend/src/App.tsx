@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, type Health, type HistoryList, type Session, type User } from "./api";
-import { AuthDialog } from "./components/AuthDialog";
+import { AuthDialog, type AuthMode } from "./components/AuthDialog";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { loadAutoSave, MAX_LOCAL, storeAutoSave, toLocal, type LocalEntry, type NewEntry } from "./lib/history";
 import { BatchPanel } from "./components/BatchPanel";
@@ -37,7 +37,7 @@ export default function App() {
   // Tài khoản và lịch sử. Khách: `local` chỉ nằm trong bộ nhớ của tab này.
   const [user, setUser] = useState<User | null>(null);
   const [registrationOpen, setRegistrationOpen] = useState(true);
-  const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
   const [local, setLocal] = useState<LocalEntry[]>([]);
   const [remote, setRemote] = useState<HistoryList | null>(null);
   const [remoteError, setRemoteError] = useState<string | null>(null);
@@ -171,7 +171,7 @@ export default function App() {
           <img src="/logo.png" alt="Logo Perfect Dragon King" width={56} height={56} />
           <div>
             <h1>PDK<span>::</span>APEX</h1>
-            <p>Perfect Dragon King · Giấu tin trong ảnh, bền vững với nén</p>
+            <p>Giấu tin trong ảnh, bền vững với nén</p>
           </div>
         </div>
         <div className="header-right">
@@ -204,7 +204,7 @@ export default function App() {
         <li><b>AES-256-GCM</b> mã hoá tại trình duyệt</li>
         <li><b>PBKDF2</b> 600.000 vòng</li>
         <li><b>CRC32</b> kiểm tra toàn vẹn</li>
-        <li><b>ZERO-LOG</b> không lưu dữ liệu của khách</li>
+        <li><b>APEXKEY</b> file khoá mã hoá bằng mật khẩu</li>
       </ul>
 
       {waking && !health && !offline && (
@@ -281,7 +281,7 @@ export default function App() {
       <footer className="footer muted small">
         {user
           ? "Máy chủ chỉ lưu những mục bạn thấy trong tab Lịch sử; mật khẩu nội dung không bao giờ được lưu"
-          : "Khách: dữ liệu chỉ được xử lý trong bộ nhớ, máy chủ không lưu lại"}{" "}
+          : "Khách: ảnh được gửi lên máy chủ để xử lý trong bộ nhớ rồi bỏ, không lưu lại"}{" "}
         · PDK © {new Date().getFullYear()}
       </footer>
 

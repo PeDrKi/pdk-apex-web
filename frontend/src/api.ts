@@ -39,6 +39,11 @@ export interface EmbedResult {
   /** Mã mục lịch sử nếu máy chủ đã lưu luôn kết quả vào tài khoản. */
   saved_id: string | null;
   save_error: string | null;
+  /** Ước lượng khả năng bị phát hiện bởi người biết thuật toán. */
+  detect_level?: "low" | "medium" | "high" | null;
+  detect_score?: number | null;
+  detect_baseline?: number | null;
+  detect_noise?: number | null;
 }
 
 export type PayloadKind = "text" | "logo" | "file";
@@ -176,6 +181,17 @@ export interface Session {
 export interface User {
   username: string;
   created_at: number;
+  has_recovery?: boolean;
+  has_2fa?: boolean;
+  /** Chỉ có ngay sau khi đăng ký, khôi phục hoặc tạo mã mới. */
+  recovery_code?: string | null;
+}
+
+export interface AuthEvent {
+  ts: number;
+  event: string;
+  label: string;
+  ip: string;
 }
 
 export interface Me {
@@ -196,6 +212,16 @@ export interface HistoryItem {
   redundancy: number;
   stego_bytes: number;
   keys_bytes: number;
+  stego_sha256?: string | null;
+  keys_sha256?: string | null;
+}
+
+export interface ProofResult {
+  found: boolean;
+  matched: "stego" | "keys" | null;
+  registered_at: number | null;
+  owner: string | null;
+  name: string | null;
 }
 
 export interface HistoryList {
@@ -327,17 +353,27 @@ export const api = {
   // ---- tài khoản và lịch sử (cookie phiên HttpOnly, trình duyệt tự gửi kèm) ----
   me: () => request<Me>("/api/auth/me"),
   register: (username: string, password: string) => request<User>("/api/auth/register", json("POST", { username, password })),
-  login: (username: string, password: string) => request<User>("/api/auth/login", json("POST", { username, password })),
+  /** Máy chủ trả 428 khi tài khoản bật xác thực hai lớp mà chưa gửi mã. */
+  login: (username: string, password: string, code?: string) =>
+    request<User>("/api/auth/login", json("POST", { username, password, code: code || null })),
+  twoFaSetup: (password: string) => request<{ secret: string; uri: string }>("/api/auth/2fa/setup", json("POST", { password })),
+  twoFaEnable: (code: string) => request<{ ok: boolean }>("/api/auth/2fa/enable", json("POST", { code })),
+  twoFaDisable: (password: string) => request<{ ok: boolean }>("/api/auth/2fa/disable", json("POST", { password })),
   logout: () => request<{ ok: boolean }>("/api/auth/logout", json("POST")),
+  recover: (username: string, code: string, next: string) =>
+    request<User>("/api/auth/recover", json("POST", { username, code, new: next })),
+  newRecoveryCode: (password: string) => request<User>("/api/auth/recovery-code", json("POST", { password })),
+  activity: () => request<AuthEvent[]>("/api/auth/activity"),
   changePassword: (current: string, next: string) =>
     request<{ ok: boolean }>("/api/auth/password", json("POST", { current, new: next })),
   deleteAccount: (password: string) => request<{ ok: boolean }>("/api/auth/delete", json("POST", { password })),
 
   history: () => request<HistoryList>("/api/history"),
+  proof: (sha256: string) => request<ProofResult>(`/api/proof/${sha256}`),
   historySave(p: { stego: Blob; keys: Blob; name: string; psnr: number | null }) {
     const fd = new FormData();
     fd.append("stego", p.stego, "stego.png");
-    fd.append("keys", p.keys, "keys.npz");
+    fd.append("keys", p.keys, "keys.bin");
     fd.append("name", p.name);
     if (p.psnr !== null) fd.append("psnr", String(p.psnr));
     return request<HistoryItem>("/api/history", { method: "POST", body: fd });

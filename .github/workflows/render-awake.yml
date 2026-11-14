@@ -1,0 +1,15 @@
+# Goi backend 10 phut mot lan de Render goi free khong ngu (Render ngu sau 15 phut khong ai dung).
+# Bat/tat bang giu-thuc.bat. Can bien RENDER_URL trong Settings > Secrets and variables > Actions > Variables.
+name: render-awake
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    if: ${{ vars.RENDER_URL != '' }}
+    steps:
+      - name: Ping Render
+        run: curl -fsS --max-time 100 --retry 2 --retry-delay 10 "${{ vars.RENDER_URL }}/api/health"

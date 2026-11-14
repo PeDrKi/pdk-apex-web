@@ -282,10 +282,7 @@ export default function App() {
       </main>
 
       <footer className="footer muted small">
-        {user
-          ? "Máy chủ chỉ lưu những mục bạn thấy trong tab Lịch sử; mật khẩu nội dung không bao giờ được lưu"
-          : "Khách: ảnh được gửi lên máy chủ để xử lý trong bộ nhớ rồi bỏ, không lưu lại"}{" "}
-        · <a href="#privacy">Chính sách quyền riêng tư</a> · PDK © {new Date().getFullYear()}
+        <a href="#privacy">Chính sách quyền riêng tư</a> · PDK © {new Date().getFullYear()}
       </footer>
 
       {authMode && (

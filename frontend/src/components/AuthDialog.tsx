@@ -201,6 +201,12 @@ export function AuthDialog({ mode, registrationOpen, onMode, onClose, onDone }: 
             lại tài khoản khi quên mật khẩu.
           </Alert>
         )}
+        {mode === "register" && (
+          <span className="muted small">
+            Tạo tài khoản nghĩa là bạn đồng ý với{" "}
+            <a href="#privacy" target="_blank" rel="noopener">chính sách quyền riêng tư</a>.
+          </span>
+        )}
         {error && <Alert kind="error">{error}</Alert>}
 
         <div className="actions">

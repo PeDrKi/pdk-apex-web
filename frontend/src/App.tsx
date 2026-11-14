@@ -7,10 +7,11 @@ import { BatchPanel } from "./components/BatchPanel";
 import { AttackPanel } from "./components/AttackPanel";
 import { ComparePanel } from "./components/ComparePanel";
 import { AboutPanel } from "./components/AboutPanel";
+import { PrivacyPanel } from "./components/PrivacyPanel";
 import { EmbedPanel } from "./components/EmbedPanel";
 import { ExtractPanel } from "./components/ExtractPanel";
 
-type Tab = "embed" | "extract" | "batch" | "attack" | "compare" | "history" | "about";
+type Tab = "embed" | "extract" | "batch" | "attack" | "compare" | "history" | "about" | "privacy";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "embed", label: "Giấu tin" },
@@ -24,6 +25,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 function tabFromHash(): Tab {
   const h = window.location.hash.replace("#", "");
+  if (h === "privacy") return "privacy"; // không nằm trên thanh tab, mở từ chân trang
   return (TABS.find((t) => t.id === h)?.id ?? "embed") as Tab;
 }
 
@@ -276,13 +278,14 @@ export default function App() {
           />
         </div>
         {tab === "about" && <AboutPanel />}
+        {tab === "privacy" && <PrivacyPanel />}
       </main>
 
       <footer className="footer muted small">
         {user
           ? "Máy chủ chỉ lưu những mục bạn thấy trong tab Lịch sử; mật khẩu nội dung không bao giờ được lưu"
           : "Khách: ảnh được gửi lên máy chủ để xử lý trong bộ nhớ rồi bỏ, không lưu lại"}{" "}
-        · PDK © {new Date().getFullYear()}
+        · <a href="#privacy">Chính sách quyền riêng tư</a> · PDK © {new Date().getFullYear()}
       </footer>
 
       {authMode && (

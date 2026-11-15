@@ -18,7 +18,7 @@ Ngày rà soát: 13/11/2026. Phạm vi: `backend/app`, `frontend/src`, cách dep
 | 10 | Pillow mở mọi định dạng ảnh, kể cả bộ giải mã ít dùng | Thấp | Đã vá (danh sách cho phép) |
 | 11 | Mật khẩu và nội dung được gửi lên máy chủ để xử lý | Thiết kế | Đã vá: mã hoá tại trình duyệt (Web Crypto). Vẫn cần HTTPS, vì Web Crypto chỉ chạy trên HTTPS/localhost |
 | 12 | Không mật khẩu thì nội dung không được mã hoá; CRC32 không chống giả mạo | Thiết kế | Đã vá: mã hoá là mặc định, muốn bỏ phải tích "Không mã hoá" |
-| 13 | File khoá chứa ảnh thu nhỏ của ảnh gốc | Thiết kế | Đã vá khi có mật khẩu: file khoá được mã hoá tại trình duyệt (`.apexkey`). Không mật khẩu thì vẫn lộ |
+| 13 | File khoá chứa ảnh thu nhỏ | Thiết kế | Không phải lỗ hổng: ảnh thu nhỏ 256 px thang xám được tạo từ ảnh ĐÃ giấu tin (chính là ảnh người dùng công khai), không phải từ ảnh gốc, chỉ dùng để căn chỉnh khi ảnh bị cắt hay xoay. Khi có mật khẩu, cả file khoá còn được mã hoá tại trình duyệt (`.apexkey`) |
 | 14 | Giới hạn tần suất lưu trong bộ nhớ từng tiến trình | Còn lại | Xem mục "Việc nên làm khi deploy" |
 
 ## Chi tiết các bản vá
@@ -63,8 +63,8 @@ Mã nguồn: `backend/app/accounts.py`, `backend/app/db.py`; test: `backend/test
   dung, kích thước và độ dự phòng do máy chủ tự rút ra từ file chứ không tin số liệu trình duyệt gửi.
 - **Giới hạn:** 200 mục và 500 MB mỗi tài khoản (chỉnh được).
 - **Những gì được lưu:** ảnh đã giấu tin, file khoá, ảnh thu nhỏ, tên ảnh và mã băm SHA-256 của hai file (dấu thời
-  gian). **Không lưu** ảnh gốc đủ kích thước và mật khẩu nội dung. Lưu ý: file khoá chứa ảnh thu nhỏ 256 px thang
-  xám của ảnh gốc. Khi người dùng đặt mật khẩu, file khoá được mã hoá AES-256-GCM tại trình duyệt (định dạng
+  gian). **Không lưu** ảnh gốc đủ kích thước và mật khẩu nội dung. File khoá chứa ảnh thu nhỏ 256 px thang
+  xám của ảnh đã giấu tin (không phải ảnh gốc) để căn chỉnh khi ảnh bị cắt hay xoay. Khi người dùng đặt mật khẩu, file khoá được mã hoá AES-256-GCM tại trình duyệt (định dạng
   `APEXKEY1`, đuôi `.apexkey`) trước khi lưu, nên máy chủ không lưu bản rõ. Không có mật khẩu thì máy chủ lưu file
   khoá ở dạng rõ, và nội dung đã giấu cũng đọc được. Người dùng tắt được việc tự lưu, xoá từng mục, xoá hết, hoặc xoá tài khoản.
 

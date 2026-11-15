@@ -132,6 +132,18 @@ def _despeckle(frame: np.ndarray):
     return out
 
 
+def _crc_ok(bits: np.ndarray) -> bool:
+    """Gói apexweb-v1 kết thúc bằng CRC32 tính trên toàn bộ phần trước (kể cả khi đã
+    mã hoá), nên kiểm tra được mà không cần mật khẩu."""
+    import struct
+    import zlib
+    n = bits.size - bits.size % 8
+    if n < 40:
+        return False
+    data = np.packbits(bits[:n].astype(np.uint8)).tobytes()
+    return (zlib.crc32(data[:-4]) & 0xFFFFFFFF) == struct.unpack(">I", data[-4:])[0]
+
+
 def masked_extract(frame: np.ndarray, keys: dict, box=None, aggregate: str = "mean") -> np.ndarray:
     """Như apexmark.extract(), nhưng chỉ các khối nằm trong `box` mới được bỏ phiếu."""
     coords = np.asarray(keys["selected_coords"]).astype(np.int64)
@@ -158,16 +170,22 @@ def masked_extract(frame: np.ndarray, keys: dict, box=None, aggregate: str = "me
     #  - có/không khử điểm nhiễu muối tiêu (điểm ảnh 0 hoặc 255 lạc lõng) trước khi đọc.
     # Độ nhất quán = các bản sao của cùng một bit đồng ý với nhau đến đâu; khi không có
     # dự phòng thì dùng độ bám lưới QIM. Cả hai đều không cần biết nội dung đã giấu.
-    best = None
+    # Thứ tự thử: N-GDC trước ảnh thô. Khi ảnh bị tăng/giảm sáng đều, ảnh thô cho các bit
+    # bị lật NHẤT QUÁN nên độ nhất quán ngang với N-GDC; nếu chọn theo độ nhất quán thuần
+    # tuý sẽ chọn nhầm và đọc ra toàn bit sai. Vì vậy:
+    #  1) nếu gói dữ liệu có CRC32 (apexweb-v1), chọn cách đọc đầu tiên khớp CRC;
+    #  2) nếu không cách nào khớp, chọn theo độ nhất quán, hoà thì ưu tiên N-GDC.
+    cands = []
     for frame_v in (frame, _despeckle(frame)):
         if frame_v is None:
             continue
         raw = _block_means(_integral(frame_v), r[valid], c[valid])
-        variants = [raw]
+        variants = []
         if use_ngdc:
             variants.append(piecewise_ngdc_correct(
                 raw, np.asarray(keys["ngdc_bin_ids"])[valid], keys["ngdc_mu1_bin"],
                 keys["ngdc_sigma1_bin"], int(keys["n_bins"])))
+        variants.append(raw)
         for m in variants:
             decisions = (np.round(m / half).astype(np.int64) & 1).astype(np.float64)
             sums, counts = np.zeros(n_bits), np.zeros(n_bits)
@@ -178,12 +196,24 @@ def masked_extract(frame: np.ndarray, keys: dict, box=None, aggregate: str = "me
                 quality = float(np.mean(np.abs(avg[counts > 0] - 0.5)))
             else:
                 quality = -_lattice_score(m, deltas[valid])
-            if best is None or quality > best[0] + 1e-9:
-                best = (quality, avg)
+            cands.append((quality, avg))
 
-    avg = best[1]
-    if aggregate == "kmeans" and redundant:
-        scrambled = one_dim_kmeans_threshold(avg).astype(np.uint8)
-    else:
-        scrambled = (avg >= 0.5).astype(np.uint8)
-    return chaotic_unscramble(scrambled, np.asarray(keys["K1_perm"]).astype(np.int64))
+    perm = np.asarray(keys["K1_perm"]).astype(np.int64)
+
+    def finish(avg):
+        if aggregate == "kmeans" and redundant:
+            scrambled = one_dim_kmeans_threshold(avg).astype(np.uint8)
+        else:
+            scrambled = (avg >= 0.5).astype(np.uint8)
+        return chaotic_unscramble(scrambled, perm)
+
+    if str(keys.get("payload_format", "")) == "apexweb-v1":
+        for _, avg in cands:
+            bits = finish(avg)
+            if _crc_ok(bits):
+                return bits
+    best = cands[0]
+    for q, avg in cands[1:]:
+        if q > best[0] + 0.02:          # chỉ đổi khi tốt hơn rõ rệt, hoà thì giữ N-GDC
+            best = (q, avg)
+    return finish(best[1])

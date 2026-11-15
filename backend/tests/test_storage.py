@@ -65,3 +65,17 @@ def test_history_downloads_are_rate_limited(monkeypatch, client):
     codes = [client.get("/api/history").status_code for _ in range(3)]
     assert codes == [401, 401, 429]
     assert client.get("/api/health").status_code == 200  # đọc thông thường không bị tính
+
+
+def test_spoofed_forwarded_ip_cannot_bypass_rate_limit(monkeypatch, client):
+    """Gọi thẳng vào máy chủ với x-forwarded-for giả, đổi IP mỗi lần: vẫn bị chặn theo IP kết nối thật."""
+    from app import security
+    monkeypatch.setattr(security, "settings", type("S", (), {"client_ip_header": "x-forwarded-for",
+                                                          "max_request_bytes": 10**8})())
+    monkeypatch.setattr(security, "rate_limiter", security.RateLimiter(2))
+    monkeypatch.setattr(security, "conn_rate_limiter", security.RateLimiter(5))
+    codes = [client.get("/api/history", headers={"x-forwarded-for": f"198.51.100.{i}, 203.0.113.7"}).status_code
+             for i in range(8)]
+    assert codes[:5] == [401] * 5 and codes[5:] == [429] * 3
+    scope = {"client": ("10.0.0.1", 1), "headers": [(b"x-forwarded-for", b"1.2.3.4, 203.0.113.7")]}
+    assert security.client_ip(scope) == "1.2.3.4" and security.conn_ip(scope) == "203.0.113.7"

@@ -55,6 +55,8 @@ class RateLimiter:
 
 
 rate_limiter = RateLimiter(settings.rate_limit_per_min)
+# Ngưỡng chung theo IP kết nối thật: gấp 10 lần ngưỡng của một người dùng.
+conn_rate_limiter = RateLimiter(settings.rate_limit_per_min * 10)
 
 
 def client_ip(scope) -> str:
@@ -68,6 +70,31 @@ def client_ip(scope) -> str:
                     return first[:64]
     client = scope.get("client")
     return client[0] if client else "?"
+
+
+def conn_ip(scope) -> str:
+    """IP của máy nối trực tiếp tới proxy cuối cùng (phần tử CUỐI của header proxy).
+
+    Phần tử đầu của x-forwarded-for do phía gửi tự khai nên có thể bị giả khi ai đó gọi thẳng
+    vào máy chủ, còn phần tử cuối do chính proxy của nền tảng ghi vào nên không giả được.
+    Khi đi qua giao diện web, đây là địa chỉ của proxy giao diện (dùng chung cho nhiều người),
+    nên chỉ dùng nó cho một ngưỡng chung cao hơn nhiều lần, chặn kiểu tấn công đổi IP giả liên tục."""
+    if settings.client_ip_header:
+        for k, v in scope.get("headers") or []:
+            if k.decode("latin-1").lower() == settings.client_ip_header:
+                last = v.decode("latin-1").split(",")[-1].strip()
+                if last:
+                    return last[:64]
+    client = scope.get("client")
+    return client[0] if client else "?"
+
+
+def allow_both(limiter: "RateLimiter", wide: "RateLimiter", scope) -> bool:
+    """Kiểm tra cả IP người dùng khai báo lẫn IP kết nối thật (ngưỡng rộng hơn)."""
+    ip, cip = client_ip(scope), conn_ip(scope)
+    if not limiter.allow(ip):
+        return False
+    return cip == ip or wide.allow("c:" + cip)
 
 
 def _rate_limited(method: str, path: str) -> bool:
@@ -102,7 +129,7 @@ class SecurityMiddleware:
         limit = settings.max_request_bytes
 
         if _rate_limited(scope["method"], path):
-            if not rate_limiter.allow(client_ip(scope)):
+            if not allow_both(rate_limiter, conn_rate_limiter, scope):
                 return await _plain(send, 429, "Bạn gửi quá nhiều yêu cầu. Hãy thử lại sau một phút.",
                                     [(b"retry-after", b"60")])
         if is_api_write:

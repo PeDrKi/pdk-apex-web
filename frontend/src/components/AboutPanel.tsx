@@ -46,7 +46,7 @@ export function AboutPanel({ showDetect = false }: { showDetect?: boolean }) {
       <h3>Mô hình bảo mật</h3>
       <ul>
         <li>
-          <strong>File khoá</strong> ghi vị trí các khối đã nhúng và một ảnh thu nhỏ 256 px của ảnh gốc. Không có nó
+          <strong>File khoá</strong> ghi vị trí các khối đã nhúng và một ảnh thu nhỏ 256 px thang xám của ảnh đã giấu tin (để căn chỉnh khi ảnh bị cắt, xoay). Không có nó
           thì không đọc lại được nội dung. Khi bạn đặt mật khẩu, cả file khoá được mã hoá tại trình duyệt (đuôi{" "}
           <code>.apexkey</code>); không đặt mật khẩu thì nó là file <code>.npz</code> ai cũng mở được. Hãy gửi ảnh và
           file khoá qua hai kênh khác nhau.
@@ -82,7 +82,7 @@ export function AboutPanel({ showDetect = false }: { showDetect?: boolean }) {
       <h3>Giới hạn cần biết</h3>
       <ul>
         <li>Giấu tin không thay thế mã hoá: công cụ phân tích chuyên sâu có thể nghi ngờ ảnh có chứa dữ liệu.</li>
-        <li>File khoá không mật khẩu để lộ ảnh thu nhỏ của ảnh gốc, nên đừng công khai nó.</li>
+        <li>File khoá không mật khẩu ai cũng mở được, ai có cả ảnh và file khoá đều đọc được nội dung, nên đừng công khai nó.</li>
         <li>Quên mật khẩu thì không ai khôi phục được nội dung lẫn file khoá.</li>
         <li>Nén JPEG chất lượng thấp, chụp màn hình hay chỉnh sửa mạnh có thể làm hỏng nội dung.</li>
       </ul>

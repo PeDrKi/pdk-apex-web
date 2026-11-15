@@ -374,7 +374,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
             ) : (
               <span className={`small ${noEncrypt ? "text-danger" : "muted"}`}>
                 {noEncrypt
-                  ? "Không mã hoá: ai có ảnh và file khoá đều đọc được nội dung, và máy chủ cũng thấy nội dung. File khoá còn chứa ảnh thu nhỏ của ảnh gốc."
+                  ? "Không mã hoá: ai có ảnh và file khoá đều đọc được nội dung, và máy chủ cũng thấy nội dung."
                   : "Nhập mật khẩu, hoặc bấm Tạo để có mật khẩu ngẫu nhiên. Nội dung và file khoá sẽ được mã hoá AES-256."}
               </span>
             )}

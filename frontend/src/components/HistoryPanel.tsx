@@ -171,7 +171,7 @@ export function HistoryPanel(p: Props) {
       {p.user && (
         <label className="check">
           <input type="checkbox" checked={p.autoSave} onChange={(e) => p.onAutoSave(e.target.checked)} />
-          Tự lưu vào tài khoản mỗi lần giấu tin (ảnh đã giấu tin và file khoá; không lưu mật khẩu. File khoá chứa ảnh thu nhỏ của ảnh gốc, và chỉ được mã hoá khi bạn đặt mật khẩu)
+          Tự lưu vào tài khoản mỗi lần giấu tin (ảnh đã giấu tin và file khoá; không lưu ảnh gốc và mật khẩu. File khoá chỉ được mã hoá khi bạn đặt mật khẩu)
         </label>
       )}
 

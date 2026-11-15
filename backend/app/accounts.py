@@ -32,7 +32,7 @@ from pydantic import BaseModel
 from . import db
 from .config import settings
 from .imaging import ImageError, open_checked
-from .security import KeysError, RateLimiter, client_ip, parse_keys
+from .security import KeysError, RateLimiter, client_ip, conn_ip, parse_keys
 from . import passwords, totp
 from .passwords import weakness
 from .storage import StorageError, storage
@@ -50,6 +50,7 @@ SCRYPT_LOG_N, SCRYPT_R, SCRYPT_P = 15, 8, 1
 
 _ip_limiter = RateLimiter(settings.login_attempts_per_min)
 _name_limiter = RateLimiter(settings.login_attempts_per_min)
+_conn_limiter = RateLimiter(settings.login_attempts_per_min * 10)
 
 
 # ---------------------------------------------------------------- mật khẩu
@@ -145,8 +146,9 @@ def same_origin(request: Request) -> None:
 
 
 def _throttle(request: Request, username: str) -> None:
-    ip = client_ip(request.scope)
-    if not _ip_limiter.allow(ip) or not _name_limiter.allow(username.lower()):
+    ip, cip = client_ip(request.scope), conn_ip(request.scope)
+    if (not _ip_limiter.allow(ip) or (cip != ip and not _conn_limiter.allow(cip))
+            or not _name_limiter.allow(username.lower())):
         raise HTTPException(429, "Bạn thử quá nhiều lần. Hãy đợi một phút rồi thử lại.",
                             headers={"Retry-After": "60"})
 

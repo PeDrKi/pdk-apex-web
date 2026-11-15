@@ -219,7 +219,7 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
             </label>
             {noEncrypt && (
               <span className="small text-danger">
-                Ai có ảnh và file khoá đều đọc được nội dung; file khoá còn chứa ảnh thu nhỏ của ảnh gốc.
+                Ai có ảnh và file khoá đều đọc được nội dung.
               </span>
             )}
             {password && !canEncryptLocally() && (

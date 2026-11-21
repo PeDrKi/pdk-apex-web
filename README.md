@@ -11,7 +11,7 @@ Web giấu thông điệp vào ảnh (steganography / watermark), dựa trên th
 
 - Giấu thông điệp UTF-8 (tiếng Việt, emoji…) vào ảnh PNG/JPEG/WEBP/BMP, xuất ảnh PNG + file khoá `.npz`.
 - Giấu **logo** vào ảnh: đen trắng (1 bit/điểm ảnh) hoặc xám 256 mức, tự thu nhỏ cho vừa dung lượng, nền trong suốt được coi là nền.
-- **Thử tấn công:** chọn và ghép tối đa 6 trong 19 phép (nén JPEG, nhiễu, lọc, chỉnh màu, hình học), chỉnh mức độ, rồi đọc lại nội dung từ ảnh đã bị tấn công. Có nút quét tất cả phép và bảng kết quả.
+- **Thử tấn công:** chọn và ghép tối đa 6 trong 20 phép (nén JPEG, nhiễu, lọc, chỉnh màu, hình học), chỉnh mức độ, rồi đọc lại nội dung từ ảnh đã bị tấn công. Có nút quét tất cả phép và bảng kết quả.
 - **So sánh:** xem chính xác điểm ảnh nào đã đổi (lớp phủ vị trí, bản đồ nhiệt, trượt trước/sau, phóng to ×8).
 - Mã hoá tuỳ chọn bằng mật khẩu (AES-256-GCM, PBKDF2-SHA256 600.000 vòng), thực hiện **ngay trong trình duyệt** bằng Web Crypto: mật khẩu và nội dung gốc không được gửi lên máy chủ (cần HTTPS hoặc localhost; nếu không có thì máy chủ mã hoá thay).
 - Giấu **file** nhỏ bất kỳ (JSON, mã serial…), giữ nguyên tên file.

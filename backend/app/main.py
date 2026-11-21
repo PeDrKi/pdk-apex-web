@@ -354,7 +354,7 @@ async def embed(
         red = max(redundancy, min(settings.max_redundancy, cap // bits.size)) if auto_redundancy else redundancy
 
         stego, keys = apexmark.embed(
-            img, bits, bc7_aware=False, delta_base=delta, redundancy=red,
+            img, bits, bc7_aware=None, delta_base=delta, redundancy=red,
             store_thumbnail=store_thumbnail, use_aco=use_aco, seed=seed)
         keys["payload_format"] = payload.FORMAT
         keys["payload_kind"] = kind

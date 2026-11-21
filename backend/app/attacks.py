@@ -31,6 +31,8 @@ class Attack:
 CATALOG: list[Attack] = [
     Attack("jpeg", "Nén JPEG", "Nén", "quality", False, lambda im, v: A.jpeg_compress(im, v),
            "Chất lượng càng thấp càng khắc nghiệt"),
+    Attack("bc7", "Nén BC7 thật", "Nén", "none", False, lambda im, v: A.bc7_compress(im),
+           "Nén texture BC7 (GPU) rồi giải nén"),
     Attack("gaussian_noise", "Nhiễu Gauss", "Nhiễu", "level", False, lambda im, v: A.gaussian_noise(im, v)),
     Attack("salt_pepper", "Nhiễu muối tiêu", "Nhiễu", "level", False, lambda im, v: A.salt_pepper(im, v)),
     Attack("median_blur", "Làm mờ median", "Lọc", "level", False, lambda im, v: A.median_blur(im, v)),

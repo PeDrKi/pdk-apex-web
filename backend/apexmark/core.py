@@ -125,7 +125,7 @@ def embed(
                 print("apexmark: không tìm thấy CompressonatorCLI -> tự tắt BC7-aware.")
         if bc7_aware:
             from . import bc7 as _bc7mod
-            bc7_fn = _bc7mod.make_bc7_fn(compressonator_path)
+            bc7_fn = _bc7mod.make_best_bc7_fn(compressonator_path)
 
     if bc7_fn is None:
         w_bc7_eff = 0.0

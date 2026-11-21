@@ -62,13 +62,75 @@ def find_compressonator(exe_path: Optional[str] = None) -> str:
     )
 
 
+def inproc_available() -> bool:
+    """True nếu bộ mã hoá BC7 chạy trong tiến trình (ispc-texcomp + texture2ddecoder) dùng được.
+    Đây là bộ mã hoá BC7 thật (Intel ISPC Texture Compressor), cài bằng pip, không cần file ngoài."""
+    try:
+        import ispc_texcomp  # noqa: F401
+        import texture2ddecoder  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
 def is_available(exe_path: Optional[str] = None) -> bool:
-    """True nếu CompressonatorCLI dùng được — tiện để chọn bc7_aware tự động."""
+    """True nếu có BC7 thật: CompressonatorCLI hoặc bộ mã hoá trong tiến trình."""
     try:
         find_compressonator(exe_path)
         return True
     except CompressonatorNotFound:
-        return False
+        return inproc_available()
+
+
+def make_inproc_bc7_fn(profile: str = "basic", use_cache: bool = True) -> Callable[[np.ndarray], np.ndarray]:
+    """Hàm `f(img) -> img_sau_BC7` dùng ispc-texcomp (mã hoá BC7 thật) + texture2ddecoder (giải mã).
+    Cùng giao diện với make_bc7_fn. Ảnh không chia hết cho 4 được đệm mép rồi cắt lại."""
+    import ispc_texcomp as I
+    import texture2ddecoder as T
+    settings = I.BC7EncSettings.from_profile(profile)
+    cache: dict = {}
+
+    def _bc7(img: np.ndarray) -> np.ndarray:
+        arr = np.clip(img, 0, 255).astype(np.uint8)
+        is_gray = arr.ndim == 2
+        if use_cache:
+            h = hashlib.blake2b(arr.tobytes(), digest_size=16)
+            h.update(str(arr.shape).encode())
+            h.update(profile.encode())
+            key = h.hexdigest()
+            if key in cache:
+                return cache[key].copy()
+        H, W = arr.shape[:2]
+        rgb = np.stack([arr] * 3, axis=-1) if is_gray else arr[:, :, :3]
+        ph, pw = (-H) % 4, (-W) % 4
+        if ph or pw:
+            rgb = np.pad(rgb, ((0, ph), (0, pw), (0, 0)), mode="edge")
+        hh, ww = rgb.shape[:2]
+        rgba = np.ascontiguousarray(np.dstack([rgb, np.full((hh, ww), 255, np.uint8)]))
+        blocks = I.compress_blocks_bc7(I.RGBASurface(rgba, ww, hh), settings)
+        raw = T.decode_bc7(bytes(blocks), ww, hh)  # BGRA
+        dec = np.frombuffer(raw, np.uint8).reshape(hh, ww, 4)[:, :, [2, 1, 0]]
+        out = dec[:H, :W].astype(np.float64)
+        if is_gray:
+            out = out.mean(axis=2)
+        if use_cache:
+            if len(cache) > 50:
+                cache.pop(next(iter(cache)))
+            cache[key] = out.copy()
+        return out
+
+    return _bc7
+
+
+def make_best_bc7_fn(exe_path: Optional[str] = None, **kw) -> Callable[[np.ndarray], np.ndarray]:
+    """CompressonatorCLI nếu tìm thấy (giữ đúng bản nghiên cứu), ngược lại bộ mã hoá trong tiến trình."""
+    try:
+        find_compressonator(exe_path)
+        return make_bc7_fn(exe_path, **kw)
+    except CompressonatorNotFound:
+        if inproc_available():
+            return make_inproc_bc7_fn()
+        raise
 
 
 def make_bc7_fn(exe_path: Optional[str] = None, timeout: float = 60.0,

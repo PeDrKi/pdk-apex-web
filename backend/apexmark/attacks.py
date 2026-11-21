@@ -223,6 +223,15 @@ def occlusion(image: np.ndarray, severity: int = 2, seed: int = 0, fill: float =
 # quả GÂY HIỂU LẦM thay vì hữu ích -- PHẢI dùng CompressonatorCLI thật.
 # --------------------------------------------------------------------------- #
 
+def _bc7_cli(exe_path=None) -> bool:
+    from . import bc7 as _bc7
+    try:
+        _bc7.find_compressonator(exe_path)
+        return True
+    except _bc7.CompressonatorNotFound:
+        return False
+
+
 def bc7_compress(image: np.ndarray, exe_path: Optional[str] = None,
                   encode_with: str = "HPC") -> np.ndarray:
     """Nén BC7 THẬT qua AMD CompressonatorCLI. Cần cài đặt, xem
@@ -234,7 +243,8 @@ def bc7_compress(image: np.ndarray, exe_path: Optional[str] = None,
             đổi trừ khi chủ động muốn so sánh nhiều bộ mã hoá BC7 (xem
             `standard_battery(extra_bc7_modes=[...])`)."""
     from . import bc7 as _bc7
-    fn = _bc7.make_bc7_fn(exe_path=exe_path, encode_with=encode_with)
+    fn = _bc7.make_best_bc7_fn(exe_path=exe_path, encode_with=encode_with) \
+        if _bc7.inproc_available() and not _bc7_cli(exe_path) else _bc7.make_bc7_fn(exe_path=exe_path, encode_with=encode_with)
     return fn(image)
 
 

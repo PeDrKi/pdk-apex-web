@@ -5,5 +5,7 @@ numpy>=1.24
 pillow>=10.3
 opencv-python-headless>=4.8
 cryptography>=43
+ispc-texcomp>=1.0
+texture2ddecoder>=1.0
 # Chỉ dùng khi đặt DATABASE_URL (Postgres, ví dụ Supabase)
 psycopg[binary]>=3.2,<4

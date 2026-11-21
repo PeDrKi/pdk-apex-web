@@ -19,7 +19,7 @@ def _attack(client, stego, keys, steps, **form):
 
 def test_catalog(client):
     j = client.get("/api/attacks").json()
-    assert len(j) == 19 and {a["group"] for a in j} == {"Nén", "Nhiễu", "Lọc", "Màu sắc", "Hình học"}
+    assert len(j) == 20 and {a["group"] for a in j} == {"Nén", "Nhiễu", "Lọc", "Màu sắc", "Hình học"}
 
 
 def test_attack_jpeg_then_read(client, photo):
@@ -69,7 +69,7 @@ def test_battery(client, photo):
         "image": ("s.png", stego, "image/png"), "keys": ("k.npz", keys, "application/octet-stream")})
     assert r.status_code == 200, r.text
     j = r.json()
-    assert len(j["rows"]) == 19 and j["intact"] + j["partial"] + j["broken"] == 19
+    assert len(j["rows"]) == 20 and j["intact"] + j["partial"] + j["broken"] == 20
     assert j["intact"] >= 12
 
 

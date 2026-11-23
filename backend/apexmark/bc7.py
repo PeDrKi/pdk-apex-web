@@ -22,7 +22,9 @@ import hashlib
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
+import threading
 import uuid
 from pathlib import Path
 from typing import Callable, Optional
@@ -62,15 +64,54 @@ def find_compressonator(exe_path: Optional[str] = None) -> str:
     )
 
 
-def inproc_available() -> bool:
-    """True nếu bộ mã hoá BC7 chạy trong tiến trình (ispc-texcomp + texture2ddecoder) dùng được.
-    Đây là bộ mã hoá BC7 thật (Intel ISPC Texture Compressor), cài bằng pip, không cần file ngoài."""
+LAST_ERROR = ""
+_PROBE: Optional[bool] = None
+_PROBE_LOCK = threading.Lock()
+_PROBE_CODE = (
+    "import numpy as np, ispc_texcomp as I, texture2ddecoder as T;"
+    "a=np.zeros((4,4,4),np.uint8);a[...,3]=255;a=np.ascontiguousarray(a);"
+    "b=I.compress_blocks_bc7(I.RGBASurface(a,4,4),I.BC7EncSettings.from_profile('basic'));"
+    "T.decode_bc7(bytes(b),4,4);print('OK')"
+)
+
+
+def _run_probe(timeout: float = 25.0) -> bool:
+    """Thử mã hoá một khối BC7 trong TIẾN TRÌNH CON (có giới hạn thời gian) để một lỗi nạp/treo/sập
+    của thư viện native không làm treo hay sập web."""
+    global LAST_ERROR, _PROBE
     try:
-        import ispc_texcomp  # noqa: F401
-        import texture2ddecoder  # noqa: F401
-        return True
-    except Exception:
-        return False
+        r = subprocess.run([sys.executable, "-c", _PROBE_CODE], capture_output=True, text=True, timeout=timeout)
+        ok = r.returncode == 0 and "OK" in r.stdout
+        if not ok:
+            LAST_ERROR = (f"exit {r.returncode}: " + (r.stderr or r.stdout)[-160:]).strip()
+    except subprocess.TimeoutExpired:
+        ok, LAST_ERROR = False, f"quá {timeout:.0f}s khi thử mã hoá BC7"
+    except Exception as e:
+        ok, LAST_ERROR = False, f"{type(e).__name__}: {e}"[:200]
+    _PROBE = ok
+    return ok
+
+
+def start_probe() -> None:
+    """Chạy phép thử ở nền (gọi lúc khởi động web) để không chặn việc mở cổng."""
+    with _PROBE_LOCK:
+        if _PROBE is None:
+            threading.Thread(target=_run_probe, daemon=True).start()
+
+
+def probe_state() -> Optional[bool]:
+    """Không chặn: True/False nếu đã thử xong, None nếu đang thử."""
+    return _PROBE
+
+
+def inproc_available() -> bool:
+    """True nếu bộ mã hoá BC7 trong tiến trình (ispc-texcomp + texture2ddecoder) dùng được.
+    Đây là bộ mã hoá BC7 thật (Intel ISPC Texture Compressor), cài bằng pip. Kết quả được thử một lần
+    trong tiến trình con rồi nhớ lại."""
+    with _PROBE_LOCK:
+        if _PROBE is not None:
+            return _PROBE
+    return _run_probe()
 
 
 def is_available(exe_path: Optional[str] = None) -> bool:

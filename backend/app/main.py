@@ -53,6 +53,21 @@ app = FastAPI(
     redoc_url=None,
 )
 
+def _bc7_cli() -> bool:
+    from apexmark import bc7
+    try:
+        bc7.find_compressonator(None)
+        return True
+    except bc7.CompressonatorNotFound:
+        return False
+
+
+@app.on_event("startup")
+def _probe_bc7() -> None:
+    from apexmark import bc7
+    bc7.start_probe()
+
+
 if settings.cors_origins:
     app.add_middleware(
         CORSMiddleware,
@@ -148,6 +163,7 @@ class Health(BaseModel):
     apexmark_version: str
     sync_available: bool
     bc7_available: bool
+    bc7_error: str = ""
     max_upload_mb: int
     max_redundancy: int
     detect_enabled: bool = False
@@ -220,11 +236,14 @@ def health(db_check: bool = False):
                 con.execute("SELECT 1").fetchone()
         except Exception:
             raise HTTPException(503, "Không kết nối được cơ sở dữ liệu.")
+    # Không nạp thư viện BC7 ngay trong health: phép thử chạy nền, trong tiến trình con.
+    bc7_ok = bc7.probe_state() is True or _bc7_cli()
     return Health(
         status="ok",
         apexmark_version=apexmark.__version__,
         sync_available=sync.is_available(),
-        bc7_available=bc7.is_available(None),
+        bc7_available=bc7_ok,
+        bc7_error="" if bc7_ok else ("đang kiểm tra" if bc7.probe_state() is None else bc7.LAST_ERROR),
         max_upload_mb=settings.max_upload_mb,
         max_redundancy=settings.max_redundancy,
         detect_enabled=settings.show_detect,

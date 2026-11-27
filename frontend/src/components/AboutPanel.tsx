@@ -57,8 +57,9 @@ export function AboutPanel({ showDetect = false }: { showDetect?: boolean }) {
           đọc được nếu thiếu mật khẩu, và mọi sửa đổi đều bị phát hiện.
         </li>
         <li>
-          <strong>Không mật khẩu:</strong> nội dung chỉ được giấu chứ không được mã hoá. <code>CRC32</code> chỉ phát
-          hiện lỗi ngẫu nhiên, không chống giả mạo.
+          <strong>Không mã hoá:</strong> ai có ảnh và file khoá đều đọc được nội dung, và máy chủ cũng thấy nội dung.
+          Nội dung chỉ được giấu chứ không được mã hoá. <code>CRC32</code> chỉ phát hiện lỗi ngẫu nhiên, không chống
+          giả mạo.
         </li>
         <li>
           <strong>Mã hoá tại trình duyệt:</strong> khi có mật khẩu, nội dung được mã hoá bằng Web Crypto ngay trên máy

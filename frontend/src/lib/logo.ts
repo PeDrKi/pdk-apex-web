@@ -25,6 +25,15 @@ export interface LogoEdit {
   contrast: number;
   /** Đảo sáng tối, chỉ dùng cho logo xám. */
   negate: boolean;
+  /** Logo đã vẽ tay từng điểm ảnh (chỉ kiểu đen trắng). Có giá trị này thì bỏ qua các chỉnh sửa còn lại. */
+  manual?: ManualLogo;
+}
+
+/** ink: h*w phần tử, 1 = nét logo. */
+export interface ManualLogo {
+  w: number;
+  h: number;
+  ink: Uint8Array;
 }
 
 export const DEFAULT_EDIT: LogoEdit = {
@@ -232,6 +241,26 @@ export async function loadLogo(file: File): Promise<ImageBitmap> {
   }
 }
 
+/** Giải ngược dữ liệu đen trắng thành mảng nét logo (1 = nét), để mở trình vẽ điểm ảnh. */
+export function inkOf(enc: EncodedLogo): Uint8Array {
+  const n = enc.width * enc.height;
+  const ink = new Uint8Array(n);
+  for (let i = 0; i < n; i++) ink[i] = enc.body[LOGO_HEADER_LEN + (i >> 3)] & (0x80 >> (i & 7)) ? 1 : 0;
+  return ink;
+}
+
+function packInk(ink: Uint8Array, w: number, h: number, threshold: number | null): EncodedLogo {
+  const header: [number, number, number] = [0, h, w];
+  const body = new Uint8Array(LOGO_HEADER_LEN + Math.ceil(ink.length / 8));
+  body.set([0, h >> 8, h & 255, w >> 8, w & 255]);
+  const preview = new Uint8Array(ink.length);
+  for (let i = 0; i < ink.length; i++) {
+    if (ink[i]) body[LOGO_HEADER_LEN + (i >> 3)] |= 0x80 >> (i & 7);
+    preview[i] = ink[i] ? 0 : 255;
+  }
+  return { body, header, width: w, height: h, previewUrl: toDataUrl(preview, w, h), threshold };
+}
+
 /** Dựng dữ liệu logo đúng như sẽ được giấu. Chạy đồng bộ nên dùng được cho xem trước trực tiếp. */
 export function encodeLogo(
   bmp: ImageBitmap,
@@ -241,6 +270,12 @@ export function encodeLogo(
   maxSide: number,
   edit: LogoEdit = DEFAULT_EDIT,
 ): EncodedLogo {
+  if (mode === "binary" && edit.manual) {
+    const m = edit.manual;
+    if (m.w * m.h > (maxBody - LOGO_HEADER_LEN) * 8)
+      throw new Error("Logo đã vẽ tay quá lớn so với chỗ chứa của ảnh. Hãy dùng ảnh lớn hơn, giảm độ dự phòng hoặc bỏ chỉnh sửa tay.");
+    return packInk(m.ink, m.w, m.h, null);
+  }
   const src = prepare(bmp, edit, invert);
   const [h, w] = fitSize(src.height, src.width, maxBody, mode, maxSide);
   if (h * w < 64)

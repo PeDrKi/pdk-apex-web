@@ -1,5 +1,6 @@
-import { useMemo } from "react";
-import { DEFAULT_EDIT, orientedUrl, type EncodedLogo, type LogoEdit, type LogoInvert, type LogoMode } from "../lib/logo";
+import { useMemo, useState } from "react";
+import { PixelEditor } from "./PixelEditor";
+import { DEFAULT_EDIT, inkOf, orientedUrl, type EncodedLogo, type LogoEdit, type LogoInvert, type LogoMode } from "../lib/logo";
 
 interface Props {
   bmp: ImageBitmap;
@@ -25,9 +26,11 @@ const THICK = ["Mảnh hơn 2", "Mảnh hơn 1", "Giữ nguyên", "Dày hơn 1",
 /** Chỉnh logo trước khi giấu: xoay, lật, cắt, ngưỡng đen trắng, độ dày nét. Xem trước đúng từng điểm ảnh. */
 export function LogoEditor({ bmp, mode, edit, onEdit, invert, onInvert, encoded, note }: Props) {
   const srcUrl = useMemo(() => orientedUrl(bmp, edit), [bmp, edit.rotate, edit.flipH]);
-  const set = (patch: Partial<LogoEdit>) => onEdit({ ...edit, ...patch });
+  const [drawing, setDrawing] = useState(false);
+  // Đổi bất kỳ chỉnh sửa nào khác thì bỏ bản vẽ tay (bản vẽ tay dựng từ kết quả của các chỉnh sửa trước đó).
+  const set = (patch: Partial<LogoEdit>) => onEdit({ ...edit, manual: undefined, ...patch });
   const { l, t, r, b } = edit.crop;
-  const changed = JSON.stringify(edit) !== JSON.stringify(DEFAULT_EDIT) || invert !== "auto";
+  const changed = JSON.stringify({ ...edit, manual: undefined }) !== JSON.stringify(DEFAULT_EDIT) || invert !== "auto" || !!edit.manual;
 
   // Xoay thì khung cắt xoay theo để vùng đã chọn không đổi.
   function rotate(dir: 1 | -1) {
@@ -70,11 +73,33 @@ export function LogoEditor({ bmp, mode, edit, onEdit, invert, onInvert, encoded,
             {encoded ? <img src={encoded.previewUrl} alt="Logo sẽ được giấu" className="pixelated" /> : <span className="muted small">—</span>}
           </div>
           <figcaption>
-            {encoded ? `Sẽ giấu đúng như thế này · ${encoded.width} × ${encoded.height} px` : "Chưa dựng được logo"}
+            {encoded ? `Sẽ giấu đúng như thế này · ${encoded.width} × ${encoded.height} px${edit.manual ? " · đã sửa tay" : ""}` : "Chưa dựng được logo"}
           </figcaption>
         </figure>
       </div>
       {note && <p className="muted small">{note}</p>}
+
+      {mode === "binary" && (
+        <div className="actions">
+          <button type="button" className="btn btn-sm" disabled={!encoded} onClick={() => setDrawing(true)}>
+            ✎ Sửa từng điểm ảnh
+          </button>
+          {edit.manual && (
+            <button type="button" className="link-btn" onClick={() => onEdit({ ...edit, manual: undefined })}>
+              Bỏ chỉnh sửa tay
+            </button>
+          )}
+        </div>
+      )}
+      {drawing && encoded && (
+        <PixelEditor
+          width={encoded.width}
+          height={encoded.height}
+          ink={inkOf(encoded)}
+          onClose={() => setDrawing(false)}
+          onApply={(ink) => onEdit({ ...edit, manual: { w: encoded.width, h: encoded.height, ink } })}
+        />
+      )}
 
       <div className="actions">
         <button type="button" className="btn btn-sm" onClick={() => rotate(-1)}>⟲ Xoay trái</button>
@@ -136,7 +161,7 @@ export function LogoEditor({ bmp, mode, edit, onEdit, invert, onInvert, encoded,
           </label>
           <label className="field">
             <span className="field-label">Phần nào là nét logo</span>
-            <select value={invert} onChange={(e) => onInvert(e.target.value as LogoInvert)}>
+            <select value={invert} onChange={(e) => { if (edit.manual) onEdit({ ...edit, manual: undefined }); onInvert(e.target.value as LogoInvert); }}>
               <option value="auto">Tự động (phần chiếm ít diện tích hơn)</option>
               <option value="yes">Phần tối</option>
               <option value="no">Phần sáng</option>

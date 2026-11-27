@@ -221,11 +221,6 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
               />
               Không mã hoá
             </label>
-            {noEncrypt && (
-              <span className="small text-danger">
-                Ai có ảnh và file khoá đều đọc được nội dung.
-              </span>
-            )}
             {password && !canEncryptLocally() && (
               <span className="muted small">Trang đang chạy qua HTTP nên mật khẩu sẽ được gửi lên máy chủ để mã hoá.</span>
             )}

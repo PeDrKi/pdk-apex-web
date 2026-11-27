@@ -340,11 +340,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
           )}
 
           <div className="field">
-            {noEncrypt ? (
-              <span className="small text-danger">
-                Không mã hoá: ai có ảnh và file khoá đều đọc được nội dung, và máy chủ cũng thấy nội dung.
-              </span>
-            ) : (
+            {!noEncrypt && (
               <>
             <label className="field-label" htmlFor="pw">Mật khẩu mã hoá</label>
             <div className="input-group">

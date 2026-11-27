@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
-import { PixelEditor } from "./PixelEditor";
-import { DEFAULT_EDIT, inkOf, orientedUrl, type EncodedLogo, type LogoEdit, type LogoInvert, type LogoMode } from "../lib/logo";
+import { useState } from "react";
+import { DEFAULT_EDIT, type EncodedLogo, type LogoEdit, type LogoInvert, type LogoMode } from "../lib/logo";
+import { LogoModal } from "./LogoModal";
 
 interface Props {
   bmp: ImageBitmap;
@@ -11,180 +11,53 @@ interface Props {
   onInvert: (v: LogoInvert) => void;
   /** Kết quả dựng với các chỉnh sửa hiện tại; null nếu dựng lỗi. */
   encoded: EncodedLogo | null;
+  /** Số byte tối đa của logo và cạnh dài tối đa, để cửa sổ Sửa logo dựng lại đúng như lúc giấu. */
+  maxBody: number | null;
+  maxSide: number;
   note?: string;
 }
 
-const CROPS: { key: keyof LogoEdit["crop"]; label: string }[] = [
-  { key: "l", label: "Cắt trái" },
-  { key: "r", label: "Cắt phải" },
-  { key: "t", label: "Cắt trên" },
-  { key: "b", label: "Cắt dưới" },
-];
-
-const THICK = ["Mảnh hơn 2", "Mảnh hơn 1", "Giữ nguyên", "Dày hơn 1", "Dày hơn 2", "Dày hơn 3"];
-
-/** Chỉnh logo trước khi giấu: xoay, lật, cắt, ngưỡng đen trắng, độ dày nét. Xem trước đúng từng điểm ảnh. */
-export function LogoEditor({ bmp, mode, edit, onEdit, invert, onInvert, encoded, note }: Props) {
-  const srcUrl = useMemo(() => orientedUrl(bmp, edit), [bmp, edit.rotate, edit.flipH]);
-  const [drawing, setDrawing] = useState(false);
-  // Đổi bất kỳ chỉnh sửa nào khác thì bỏ bản vẽ tay (bản vẽ tay dựng từ kết quả của các chỉnh sửa trước đó).
-  const set = (patch: Partial<LogoEdit>) => onEdit({ ...edit, manual: undefined, ...patch });
-  const { l, t, r, b } = edit.crop;
+/** Xem trước logo sẽ giấu. Mọi chỉnh sửa và vẽ tay nằm trong cửa sổ "Sửa logo". */
+export function LogoEditor({ bmp, mode, edit, onEdit, invert, onInvert, encoded, maxBody, maxSide, note }: Props) {
+  const [open, setOpen] = useState(false);
   const changed = JSON.stringify({ ...edit, manual: undefined }) !== JSON.stringify(DEFAULT_EDIT) || invert !== "auto" || !!edit.manual;
-
-  // Xoay thì khung cắt xoay theo để vùng đã chọn không đổi.
-  function rotate(dir: 1 | -1) {
-    const crop = dir === 1 ? { l: b, t: l, r: t, b: r } : { l: t, t: r, r: b, b: l };
-    const turn = edit.flipH ? -dir : dir; // ảnh đang lật thì góc gốc quay ngược lại
-    set({ rotate: ((edit.rotate + turn * 90 + 360) % 360) as LogoEdit["rotate"], crop });
-  }
 
   return (
     <div className="logo-editor">
       <div className="logo-editor-head">
-        <span className="field-label">Chỉnh logo trước khi giấu</span>
+        <span className="field-label">Logo sẽ được giấu</span>
         {changed && (
-          <button
-            type="button"
-            className="link-btn"
-            onClick={() => {
-              onEdit(DEFAULT_EDIT);
-              onInvert("auto");
-            }}
-          >
+          <button type="button" className="link-btn" onClick={() => { onEdit(DEFAULT_EDIT); onInvert("auto"); }}>
             Đặt lại
           </button>
         )}
       </div>
-
-      <div className="logo-editor-views">
-        <figure>
-          <div className="crop-stage">
-            <img src={srcUrl} alt="Logo gốc" />
-            <div
-              className="crop-box"
-              style={{ left: `${l * 100}%`, top: `${t * 100}%`, right: `${r * 100}%`, bottom: `${b * 100}%` }}
-            />
-          </div>
-          <figcaption>Logo gốc · khung xanh là phần được giữ</figcaption>
-        </figure>
-        <figure>
-          <div className="logo-out">
-            {encoded ? <img src={encoded.previewUrl} alt="Logo sẽ được giấu" className="pixelated" /> : <span className="muted small">—</span>}
-          </div>
-          <figcaption>
-            {encoded ? `Sẽ giấu đúng như thế này · ${encoded.width} × ${encoded.height} px${edit.manual ? " · đã sửa tay" : ""}` : "Chưa dựng được logo"}
-          </figcaption>
-        </figure>
+      <div className="logo-out">
+        {encoded ? <img src={encoded.previewUrl} alt="Logo sẽ được giấu" className="pixelated" /> : <span className="muted small">—</span>}
       </div>
+      <p className="muted small">
+        {encoded ? `Sẽ giấu đúng như thế này · ${encoded.width} × ${encoded.height} px${edit.manual ? " · đã vẽ tay" : ""}` : "Chưa dựng được logo"}
+      </p>
       {note && <p className="muted small">{note}</p>}
-
-      {mode === "binary" && (
-        <div className="actions">
-          <button type="button" className="btn btn-sm" disabled={!encoded} onClick={() => setDrawing(true)}>
-            ✎ Sửa từng điểm ảnh
-          </button>
-          {edit.manual && (
-            <button type="button" className="link-btn" onClick={() => onEdit({ ...edit, manual: undefined })}>
-              Bỏ chỉnh sửa tay
-            </button>
-          )}
-        </div>
-      )}
-      {drawing && encoded && (
-        <PixelEditor
-          width={encoded.width}
-          height={encoded.height}
-          ink={inkOf(encoded)}
-          onClose={() => setDrawing(false)}
-          onApply={(ink) => onEdit({ ...edit, manual: { w: encoded.width, h: encoded.height, ink } })}
-        />
-      )}
-
       <div className="actions">
-        <button type="button" className="btn btn-sm" onClick={() => rotate(-1)}>⟲ Xoay trái</button>
-        <button type="button" className="btn btn-sm" onClick={() => rotate(1)}>⟳ Xoay phải</button>
-        <button
-          type="button"
-          className={`btn btn-sm${edit.flipH ? " is-on" : ""}`}
-          aria-pressed={edit.flipH}
-          onClick={() => set({ flipH: !edit.flipH, crop: { l: r, t, r: l, b } })}
-        >
-          ⇋ Lật ngang
+        <button type="button" className="btn btn-sm" disabled={maxBody === null} onClick={() => setOpen(true)}>
+          ✎ Sửa logo
         </button>
       </div>
-
-      <label className="check">
-        <input type="checkbox" checked={edit.autoTrim} onChange={(e) => set({ autoTrim: e.target.checked })} />
-        Tự cắt viền trống quanh logo (logo to và rõ hơn trong cùng kích thước)
-      </label>
-
-      <div className="slider-grid">
-        {CROPS.map((c) => (
-          <label key={c.key} className="field">
-            <span className="field-label">{c.label}: {Math.round(edit.crop[c.key] * 100)}%</span>
-            <input
-              type="range"
-              min={0}
-              max={45}
-              value={Math.round(edit.crop[c.key] * 100)}
-              onChange={(e) => set({ crop: { ...edit.crop, [c.key]: Number(e.target.value) / 100 } })}
-            />
-          </label>
-        ))}
-      </div>
-
-      {mode === "binary" ? (
-        <>
-          <div className="field">
-            <span className="field-label">
-              Ngưỡng đen trắng: {edit.threshold ?? `tự động${encoded?.threshold != null ? ` (${encoded.threshold})` : ""}`}
-            </span>
-            <input
-              type="range"
-              min={1}
-              max={254}
-              aria-label="Ngưỡng đen trắng"
-              value={edit.threshold ?? encoded?.threshold ?? 127}
-              onChange={(e) => set({ threshold: Number(e.target.value) })}
-            />
-            <label className="check">
-              <input type="checkbox" checked={edit.threshold === null} onChange={(e) => set({ threshold: e.target.checked ? null : (encoded?.threshold ?? 127) })} />
-              Tự chọn ngưỡng
-            </label>
-            <span className="muted small">Kéo ngưỡng nếu logo bị mất nét nhạt hoặc dính cả phần nền.</span>
-          </div>
-          <label className="field">
-            <span className="field-label">Độ dày nét: {THICK[edit.thicken + 2]}</span>
-            <input type="range" min={-2} max={3} value={edit.thicken} onChange={(e) => set({ thicken: Number(e.target.value) })} />
-            <span className="muted small">Nét dày hơn sẽ dễ nhận ra hơn khi ảnh bị tấn công làm hỏng vài điểm.</span>
-          </label>
-          <label className="field">
-            <span className="field-label">Phần nào là nét logo</span>
-            <select value={invert} onChange={(e) => { if (edit.manual) onEdit({ ...edit, manual: undefined }); onInvert(e.target.value as LogoInvert); }}>
-              <option value="auto">Tự động (phần chiếm ít diện tích hơn)</option>
-              <option value="yes">Phần tối</option>
-              <option value="no">Phần sáng</option>
-            </select>
-          </label>
-        </>
-      ) : (
-        <>
-        <label className="check">
-          <input type="checkbox" checked={edit.negate} onChange={(e) => set({ negate: e.target.checked })} />
-          Đảo sáng tối (dùng khi logo nét sáng trên nền trong suốt)
-        </label>
-        <div className="slider-grid">
-          <label className="field">
-            <span className="field-label">Độ sáng: {edit.brightness}</span>
-            <input type="range" min={-100} max={100} value={edit.brightness} onChange={(e) => set({ brightness: Number(e.target.value) })} />
-          </label>
-          <label className="field">
-            <span className="field-label">Tương phản: {edit.contrast}</span>
-            <input type="range" min={-100} max={100} value={edit.contrast} onChange={(e) => set({ contrast: Number(e.target.value) })} />
-          </label>
-        </div>
-        </>
+      {open && maxBody !== null && (
+        <LogoModal
+          bmp={bmp}
+          mode={mode}
+          maxBody={maxBody}
+          maxSide={maxSide}
+          edit={edit}
+          invert={invert}
+          onClose={() => setOpen(false)}
+          onApply={(e, i) => {
+            onEdit(e);
+            onInvert(i);
+          }}
+        />
       )}
     </div>
   );

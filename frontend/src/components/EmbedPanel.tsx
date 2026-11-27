@@ -296,6 +296,8 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
                   invert={logoInvert}
                   onInvert={setLogoInvert}
                   encoded={logoEnc.enc}
+                  maxBody={maxBytes}
+                  maxSide={logoSide}
                   note={
                     logoEnc.enc && maxBytes !== null
                       ? `Logo chiếm ${formatBytes(logoBytes)} trên tối đa ${formatBytes(maxBytes)}${logoRepeat ? `, sẽ được lặp ×${logoRepeat} trong ảnh` : ""}.`

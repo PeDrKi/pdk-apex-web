@@ -112,7 +112,7 @@ export interface AttackInfo {
   id: string;
   name: string;
   group: string;
-  param: "level" | "quality" | "none";
+  param: "level" | "quality" | "none" | "region" | "size";
   geometric: boolean;
   hint: string;
 }
@@ -120,6 +120,8 @@ export interface AttackInfo {
 export interface AttackStep {
   id: string;
   value: number;
+  /** Chỉ dùng cho phép chỉnh tay: crop_custom {x,y,w,h} (tỉ lệ 0..1) hoặc resize_custom {w,h} (pixel). */
+  params?: Record<string, number>;
 }
 
 export type AttackStatus = "intact" | "partial" | "broken";

@@ -323,3 +323,25 @@ a.btn { text-decoration: none; }
 .wake-note { margin: 14px 0 0; padding: 9px 12px; border-radius: var(--radius); border: 1px solid rgb(245 196 81 / 35%); background: var(--warn-soft); color: var(--warn); font-size: 0.85rem; }
 .footer a { color: var(--primary); text-decoration: none; }
 .footer a:hover { text-decoration: underline; }
+
+/* Trình chỉnh ảnh (canvas) + thẻ BC7 (tab Thử tấn công) */
+.editor-open { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin: 16px 0; padding: 14px 16px; border: 1px dashed var(--line, #1f3a33); }
+.modal-back { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, 0.7); }
+.editor-modal { width: min(1200px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 16px 20px; background: #0b1412; border: 1px solid #00e5a0; box-shadow: 0 0 30px rgba(0, 229, 160, 0.2); }
+.editor-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.editor-head h3 { margin: 0; color: #00e5a0; }
+.editor-body { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.editor-canvas-wrap { flex: 1 1 520px; min-width: 0; }
+.editor-canvas { display: block; max-width: 100%; height: auto; touch-action: none; cursor: crosshair; border: 1px solid #1f3a33; background: #000; }
+.editor-side { flex: 0 1 300px; display: grid; gap: 16px; }
+.editor-side section { display: grid; gap: 8px; }
+.editor-preview { display: block; max-width: 100%; border: 1px solid #1f3a33; background: repeating-conic-gradient(#111 0 25%, #181818 0 50%) 0 0 / 16px 16px; }
+.editor-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.editor-num { display: inline-flex; gap: 6px; align-items: center; }
+.editor-num input { width: 84px; }
+.editor-lock { display: inline-flex; gap: 6px; align-items: center; }
+.bc7-card { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; margin: 16px 0; padding: 16px; border: 1px solid #00e5a0; box-shadow: 0 0 18px rgba(0, 229, 160, 0.25); }
+.bc7-card h3 { margin: 6px 0; color: #00e5a0; }
+.bc7-card > div:first-child { flex: 1 1 320px; }
+.bc7-badge { font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.12em; padding: 2px 8px; background: #00e5a0; color: #04110d; }
+.bc7-actions { display: flex; gap: 10px; flex-wrap: wrap; }

@@ -14,9 +14,10 @@ import { isZip, unpackBundle } from "../lib/zip";
 import { base64ToBlob, downloadBlob, stem } from "../utils";
 import { Alert } from "./Alert";
 import { Dropzone } from "./Dropzone";
+import { ImageEditor } from "./ImageEditor";
 import { RevealedView } from "./RevealedView";
 
-const MAX_STEPS = 6;
+const MAX_STEPS = 2;
 const LEVELS = ["Nhẹ", "Vừa", "Nặng"];
 const STATUS_TEXT: Record<AttackStatus, string> = {
   intact: "Nguyên vẹn",
@@ -26,6 +27,14 @@ const STATUS_TEXT: Record<AttackStatus, string> = {
 
 function StatusTag({ status }: { status: AttackStatus }) {
   return <span className={`tag tag-${status}`}>{STATUS_TEXT[status]}</span>;
+}
+
+function customLabel(s: AttackStep): string | null {
+  const p = s.params;
+  if (!p) return null;
+  if (s.id === "crop_custom") return `Cắt vùng ${Math.round(p.w * 100)}%×${Math.round(p.h * 100)}% từ (${Math.round(p.x * 100)}%, ${Math.round(p.y * 100)}%)`;
+  if (s.id === "resize_custom") return `Đổi kích thước ${p.w}×${p.h}`;
+  return null;
 }
 
 function pct(ber: number | null) {
@@ -45,6 +54,7 @@ export function AttackPanel({ session }: { session: Session | null }) {
   const [battery, setBattery] = useState<BatteryResult | null>(null);
   const [revealed, setRevealed] = useState<Revealed | null>(null);
   const [revealError, setRevealError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
   async function take(f: File | null, slot: "image" | "keys") {
     setResult(null);
@@ -80,9 +90,10 @@ export function AttackPanel({ session }: { session: Session | null }) {
 
   const groups = useMemo(() => {
     const m = new Map<string, AttackInfo[]>();
-    for (const a of catalog) m.set(a.group, [...(m.get(a.group) ?? []), a]);
+    for (const a of catalog) if (a.id !== "bc7") m.set(a.group, [...(m.get(a.group) ?? []), a]);
     return [...m.entries()];
   }, [catalog]);
+  const bc7 = useMemo(() => catalog.find((a) => a.id === "bc7"), [catalog]);
   const byId = useMemo(() => new Map(catalog.map((a) => [a.id, a])), [catalog]);
 
   const originalUrl = useMemo(() => (image ? URL.createObjectURL(image) : null), [image]);
@@ -97,8 +108,9 @@ export function AttackPanel({ session }: { session: Session | null }) {
     setSteps(steps.map((s, j) => (j === i ? { ...s, value } : s)));
   }
 
-  async function run(kind: "attack" | "battery") {
+  async function run(kind: "attack" | "battery", only?: AttackStep[]) {
     if (!image) return;
+    const plan = only ?? steps;
     setBusy(kind);
     setError(null);
     try {
@@ -108,8 +120,8 @@ export function AttackPanel({ session }: { session: Session | null }) {
         setRevealError(null);
         // Nhận dữ liệu thô rồi giải mã tại trình duyệt: mật khẩu không gửi lên máy chủ.
         const k = keys && (await openKeysFile(keys, password));
-        let res = await api.attack(image, steps, k, "", true);
-        if (res.extract && needsServerDecrypt(res.extract)) res = await api.attack(image, steps, k, password, false);
+        let res = await api.attack(image, plan, k, "", true);
+        if (res.extract && needsServerDecrypt(res.extract)) res = await api.attack(image, plan, k, password, false);
         setResult(res);
         if (res.extract) {
           try {
@@ -161,6 +173,47 @@ export function AttackPanel({ session }: { session: Session | null }) {
         </div>
       </div>
 
+      {bc7 && (
+        <div className="bc7-card">
+          <div>
+            <span className="bc7-badge">NỔI BẬT</span>
+            <h3>Nén BC7 thật</h3>
+            <p className="muted small">
+              BC7 là chuẩn nén texture của card đồ hoạ (game, ứng dụng 3D), cắt ảnh thành khối 4×4 rồi mã hoá lại nên
+              dễ xoá mất tin giấu. Đây là bộ mã hoá BC7 thật, cũng là phép thử khó nhất mà APEX được thiết kế để chống chịu.
+            </p>
+          </div>
+          <div className="bc7-actions">
+            <button type="button" className="btn btn-primary" disabled={!image || !keys || !!busy} onClick={() => run("attack", [{ id: "bc7", value: 0 }])}>
+              {busy === "attack" ? "Đang chạy…" : "Thử ngay BC7"}
+            </button>
+            <button type="button" className="btn" disabled={steps.length >= MAX_STEPS} onClick={() => addStep(bc7)}>
+              + Thêm vào chuỗi
+            </button>
+          </div>
+        </div>
+      )}
+
+      {originalUrl && (
+        <div className="editor-open">
+          <div>
+            <span className="field-label">Chỉnh ảnh như trình chỉnh sửa</span>
+            <p className="muted small">Mở ảnh trên canvas để tự cắt vùng mong muốn và đổi kích thước, rồi thêm vào chuỗi tấn công.</p>
+          </div>
+          <button type="button" className="btn" disabled={steps.length >= MAX_STEPS} onClick={() => setEditing(true)}>
+            Mở trình chỉnh ảnh
+          </button>
+        </div>
+      )}
+      {editing && originalUrl && (
+        <ImageEditor
+          src={originalUrl}
+          slotsLeft={MAX_STEPS - steps.length}
+          onClose={() => setEditing(false)}
+          onApply={(st) => setSteps([...steps, ...st].slice(0, MAX_STEPS))}
+        />
+      )}
+
       <fieldset className="field">
         <legend className="field-label">3. Chọn phép tấn công (tối đa {MAX_STEPS}, áp dụng lần lượt)</legend>
         <div className="attack-groups">
@@ -190,12 +243,13 @@ export function AttackPanel({ session }: { session: Session | null }) {
         <ol className="chain">
           {steps.map((s, i) => {
             const a = byId.get(s.id);
-            if (!a) return null;
+            const custom = s.params ? customLabel(s) : null;
+            if (!a && !custom) return null;
             return (
               <li key={i}>
                 <span className="chain-n">{String(i + 1).padStart(2, "0")}</span>
-                <strong>{a.name}</strong>
-                {a.param === "level" && (
+                <strong>{custom ?? a!.name}</strong>
+                {a?.param === "level" && (
                   <span className="segmented small-seg">
                     {LEVELS.map((l, k) => (
                       <button
@@ -209,7 +263,7 @@ export function AttackPanel({ session }: { session: Session | null }) {
                     ))}
                   </span>
                 )}
-                {a.param === "quality" && (
+                {a?.param === "quality" && (
                   <label className="chain-q">
                     <input
                       type="range"
@@ -225,7 +279,7 @@ export function AttackPanel({ session }: { session: Session | null }) {
                 <button
                   type="button"
                   className="link-btn chain-x"
-                  aria-label={`Bỏ ${a.name}`}
+                  aria-label={`Bỏ ${custom ?? a!.name}`}
                   onClick={() => setSteps(steps.filter((_, j) => j !== i))}
                 >
                   Bỏ

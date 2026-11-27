@@ -54,7 +54,7 @@ def test_attack_encrypted_needs_password(client, photo):
 
 @pytest.mark.parametrize("steps", [
     "not json", [], [{"id": "nope"}], [{"id": "jpeg", "value": 200}], [{"id": "rotate", "value": 9}],
-    [{"id": "rotate", "value": "2"}], [{"id": "jpeg", "value": 50}] * 7, {"id": "jpeg"},
+    [{"id": "rotate", "value": "2"}], [{"id": "jpeg", "value": 50}] * 3, {"id": "jpeg"},
 ])
 def test_attack_bad_steps(client, photo, steps):
     raw = steps if isinstance(steps, str) else json.dumps(steps)
@@ -95,3 +95,28 @@ def test_compare_identical_and_mismatch(client, photo):
     r = client.post("/api/compare", files={"original": ("a.png", a, "image/png"),
                                            "stego": ("b.png", png_bytes(photo[:100]), "image/png")})
     assert r.status_code == 400
+
+
+def test_custom_crop_and_resize_steps():
+    import json
+    import numpy as np
+    from app import attacks as atk
+    img = (np.random.RandomState(0).rand(100, 120, 3) * 255).astype(np.uint8)
+    plan = atk.parse_steps(json.dumps([
+        {"id": "crop_custom", "params": {"x": 0.25, "y": 0.1, "w": 0.5, "h": 0.5}},
+        {"id": "resize_custom", "params": {"w": 80, "h": 40}},
+    ]))
+    out = atk.apply_steps(img, plan)
+    assert out.shape[:2] == (40, 80)
+    assert "Cắt vùng" in plan[0].label and "80×40" in plan[1].label
+    for bad in ({"x": 0.8, "y": 0, "w": 0.5, "h": 0.5}, {"x": 0, "y": 0, "w": 0.0, "h": 1}):
+        try:
+            atk.parse_steps(json.dumps([{"id": "crop_custom", "params": bad}]))
+            assert False
+        except atk.AttackError:
+            pass
+    try:
+        atk.apply_steps(img, atk.parse_steps(json.dumps([{"id": "resize_custom", "params": {"w": 4000, "h": 4000}}])))
+        assert False
+    except atk.AttackError:
+        pass

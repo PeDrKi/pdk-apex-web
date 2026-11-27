@@ -51,7 +51,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
   const [secretFile, setSecretFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [noEncrypt, setNoEncrypt] = useState(true); // mặc định không mã hoá, mật khẩu chỉ mở khi người dùng bỏ chọn
+  const [encOpen, setEncOpen] = useState(false); // mục Mã hoá (nâng cao): đóng sẵn, không đặt mật khẩu thì không mã hoá
   const [preset, setPreset] = useState<PresetId>(DEFAULT_PRESET.id);
   const [redundancy, setRedundancy] = useState<number>(DEFAULT_PRESET.redundancy);
   const [delta, setDelta] = useState<number>(DEFAULT_PRESET.delta);
@@ -137,7 +137,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
   const over = kind !== "logo" && maxBytes !== null && used > maxBytes;
   const pct = maxBytes ? Math.min(100, (used / Math.max(1, maxBytes)) * 100) : 0;
   const hasContent = kind === "text" ? !!message : kind === "logo" ? !!logoEnc.enc : !!secretFile;
-  const ready = !!image && !!cap && hasContent && !over && (!!password || noEncrypt);
+  const ready = !!image && !!cap && hasContent && !over;
   const local = canEncryptLocally();
 
   const result = out?.result ?? null;
@@ -342,9 +342,14 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
           )}
 
           <div className="field">
-            {!noEncrypt && (
-              <>
-            <label className="field-label" htmlFor="pw">Mật khẩu mã hoá</label>
+            <button type="button" className="link-btn" aria-expanded={encOpen} onClick={() => setEncOpen((v) => !v)}>
+              {encOpen ? "Ẩn mục mã hoá" : password ? "Mã hoá bằng mật khẩu: đang bật" : "Mã hoá bằng mật khẩu (nâng cao, không bắt buộc)"}
+            </button>
+            {encOpen && (
+              <div className="advanced">
+                <span className="field-label">Mã hoá bằng mật khẩu</span>
+                <span className="muted small">Không bắt buộc. Để trống thì nội dung được giấu mà không mã hoá.</span>
+                <label className="field-label" htmlFor="pw">Mật khẩu mã hoá</label>
             <div className="input-group">
               <input id="pw" type={showPw ? "text" : "password"} value={password} autoComplete="new-password" placeholder="Mật khẩu để mã hoá nội dung và file khoá" onChange={(e) => setPassword(e.target.value)} />
               <button type="button" className="btn btn-ghost" onClick={() => setShowPw((v) => !v)}>
@@ -379,19 +384,8 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
                 Nhập mật khẩu, hoặc bấm Tạo để có mật khẩu ngẫu nhiên. Nội dung và file khoá sẽ được mã hoá AES-256.
               </span>
             )}
-              </>
+              </div>
             )}
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={noEncrypt}
-                onChange={(e) => {
-                  setNoEncrypt(e.target.checked);
-                  if (e.target.checked) setPassword("");
-                }}
-              />
-              Không mã hoá
-            </label>
           </div>
         </div>
       </div>
@@ -547,7 +541,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
               Dấu vết đo được {(result.detect_score * 100).toFixed(1)}% (ảnh gốc {((result.detect_baseline ?? 0) * 100).toFixed(1)}%,
               ngưỡng nhiễu {((result.detect_noise ?? 0) * 100).toFixed(1)}%).
               {result.detect_level !== "low" &&
-                " Muốn kín hơn: chọn mức Kín đáo, bỏ \"Dùng hết chỗ trống\", rút ngắn nội dung hoặc dùng ảnh lớn hơn."}
+                " Muốn kín hơn: chọn mức Nhẹ, bỏ \"Dùng hết chỗ trống\", rút ngắn nội dung hoặc dùng ảnh lớn hơn."}
             </Alert>
           )}
           {out.keysSealed && (

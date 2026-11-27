@@ -39,7 +39,7 @@ export function AboutPanel({ showDetect = false }: { showDetect?: boolean }) {
         Sau mỗi lần giấu tin, web tự chạy một <strong>bộ dò</strong> đóng vai người biết rõ thuật toán APEX nhưng không
         có file khoá. Bộ dò đo xem bao nhiêu khối 4×4 nằm đúng trên lưới lượng tử, rồi so với ảnh gốc. Kết quả phụ thuộc
         chủ yếu vào <strong>số khối bị đụng tới</strong>, tức độ dài nội dung nhân với độ dự phòng, chia cho kích thước
-        ảnh. Giảm cường độ nhúng làm ảnh khó thấy bằng mắt hơn nhưng không qua mặt được bộ dò. Mức Kín đáo (dự phòng 1,
+        ảnh. Giảm cường độ nhúng làm ảnh khó thấy bằng mắt hơn nhưng không qua mặt được bộ dò. Mức Nhẹ (dự phòng 1,
         không dùng hết chỗ trống) là mức khó phát hiện nhất. Đây là một bộ dò cụ thể, công cụ khác có thể nhạy hơn.
       </p>)}
 

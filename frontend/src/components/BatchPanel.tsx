@@ -46,7 +46,7 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
   const [template, setTemplate] = useState("© PDK 2026 · {ten} · #{stt}");
   const [perLine, setPerLine] = useState(false);
   const [password, setPassword] = useState("");
-  const [noEncrypt, setNoEncrypt] = useState(true); // mặc định không mã hoá, mật khẩu chỉ mở khi người dùng bỏ chọn
+  const [encOpen, setEncOpen] = useState(false); // mục Mã hoá (nâng cao): đóng sẵn, không đặt mật khẩu thì không mã hoá
   const [presetId, setPresetId] = useState<(typeof PRESETS)[number]["id"]>(DEFAULT_PRESET.id);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
@@ -204,23 +204,16 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
             </select>
           </label>
           <div className="field">
-            {!noEncrypt && (
-              <>
+            <button type="button" className="link-btn" aria-expanded={encOpen} onClick={() => setEncOpen((v) => !v)}>
+              {encOpen ? "Ẩn mục mã hoá" : password ? "Mã hoá bằng mật khẩu: đang bật" : "Mã hoá bằng mật khẩu (nâng cao, không bắt buộc)"}
+            </button>
+            {encOpen && (
+              <div className="advanced">
                 <label className="field-label" htmlFor="bpw">Mật khẩu chung (mã hoá cả nội dung và file khoá)</label>
                 <input id="bpw" type="password" value={password} autoComplete="new-password" onChange={(e) => setPassword(e.target.value)} />
-              </>
+                <span className="muted small">Không bắt buộc. Để trống thì nội dung được giấu mà không mã hoá.</span>
+              </div>
             )}
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={noEncrypt}
-                onChange={(e) => {
-                  setNoEncrypt(e.target.checked);
-                  if (e.target.checked) setPassword("");
-                }}
-              />
-              Không mã hoá
-            </label>
             {password && !canEncryptLocally() && (
               <span className="muted small">Trang đang chạy qua HTTP nên mật khẩu sẽ được gửi lên máy chủ để mã hoá.</span>
             )}
@@ -235,7 +228,7 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
       {error && <Alert kind="error">{error}</Alert>}
 
       <div className="actions">
-        <button type="button" className="btn btn-primary" disabled={!files.length || !template.trim() || busy || (!password && !noEncrypt)} onClick={run}>
+        <button type="button" className="btn btn-primary" disabled={!files.length || !template.trim() || busy} onClick={run}>
           {busy && <span className="spinner" aria-hidden="true" />}
           {busy ? `Đang giấu ${done + failed + 1}/${rows.length}…` : `Giấu tin vào ${files.length || ""} ảnh`}
         </button>

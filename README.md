@@ -20,7 +20,7 @@ Web giấu thông điệp vào ảnh (steganography / watermark), dựa trên th
 - **Hàng loạt:** giấu tin vào tối đa 50 ảnh một lượt, mỗi ảnh một nội dung (`{ten}`, `{stt}` hoặc mỗi dòng một ảnh), tải về một gói zip kèm `danh_sach.csv`.
 - **Căn chỉnh chính xác đến từng điểm ảnh** khi ảnh bị cắt/dịch, và bỏ phiếu chỉ trên phần ảnh còn lại (`app/align.py`).
 - Kiểm tra toàn vẹn CRC32: lúc đọc báo thông điệp nguyên vẹn hay có thể đã sai bit.
-- Ba mức bền vững (Dung lượng cao / Cân bằng / Bền vững) + tuỳ chọn nâng cao (độ dự phòng, delta, ACO).
+- Ba mức bền vững (Nhẹ / Cân bằng / Bền vững) + tuỳ chọn nâng cao (độ dự phòng, delta, ACO).
 - Hiển thị dung lượng tối đa theo ảnh, PSNR, so sánh ảnh trước/sau.
 - Đọc tin từ ảnh đã bị nén JPEG, cắt mép, co giãn, xoay (dùng ảnh thu nhỏ lưu trong khoá + OpenCV).
 - Đọc được cả khoá tạo bằng CLI `python -m apexmark embed --text`.

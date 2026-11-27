@@ -46,7 +46,7 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
   const [template, setTemplate] = useState("© PDK 2026 · {ten} · #{stt}");
   const [perLine, setPerLine] = useState(false);
   const [password, setPassword] = useState("");
-  const [noEncrypt, setNoEncrypt] = useState(false);
+  const [noEncrypt, setNoEncrypt] = useState(true); // mặc định không mã hoá, mật khẩu chỉ mở khi người dùng bỏ chọn
   const [presetId, setPresetId] = useState<(typeof PRESETS)[number]["id"]>(DEFAULT_PRESET.id);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
@@ -204,8 +204,12 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
             </select>
           </label>
           <div className="field">
-            <label className="field-label" htmlFor="bpw">Mật khẩu chung (mã hoá cả nội dung và file khoá)</label>
-            <input id="bpw" type="password" value={password} autoComplete="new-password" disabled={noEncrypt} onChange={(e) => setPassword(e.target.value)} />
+            {!noEncrypt && (
+              <>
+                <label className="field-label" htmlFor="bpw">Mật khẩu chung (mã hoá cả nội dung và file khoá)</label>
+                <input id="bpw" type="password" value={password} autoComplete="new-password" onChange={(e) => setPassword(e.target.value)} />
+              </>
+            )}
             <label className="check">
               <input
                 type="checkbox"
@@ -215,7 +219,7 @@ export function BatchPanel({ onResult, saveToAccount }: Props) {
                   if (e.target.checked) setPassword("");
                 }}
               />
-              Không mã hoá (không khuyên dùng)
+              Không mã hoá
             </label>
             {noEncrypt && (
               <span className="small text-danger">

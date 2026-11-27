@@ -51,7 +51,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
   const [secretFile, setSecretFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [noEncrypt, setNoEncrypt] = useState(false);
+  const [noEncrypt, setNoEncrypt] = useState(true); // mặc định không mã hoá, mật khẩu chỉ mở khi người dùng bỏ chọn
   const [preset, setPreset] = useState<PresetId>(DEFAULT_PRESET.id);
   const [redundancy, setRedundancy] = useState<number>(DEFAULT_PRESET.redundancy);
   const [delta, setDelta] = useState<number>(DEFAULT_PRESET.delta);
@@ -340,16 +340,21 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
           )}
 
           <div className="field">
+            {noEncrypt ? (
+              <span className="small text-danger">
+                Không mã hoá: ai có ảnh và file khoá đều đọc được nội dung, và máy chủ cũng thấy nội dung.
+              </span>
+            ) : (
+              <>
             <label className="field-label" htmlFor="pw">Mật khẩu mã hoá</label>
             <div className="input-group">
-              <input id="pw" type={showPw ? "text" : "password"} value={password} autoComplete="new-password" placeholder="Mật khẩu để mã hoá nội dung và file khoá" disabled={noEncrypt} onChange={(e) => setPassword(e.target.value)} />
+              <input id="pw" type={showPw ? "text" : "password"} value={password} autoComplete="new-password" placeholder="Mật khẩu để mã hoá nội dung và file khoá" onChange={(e) => setPassword(e.target.value)} />
               <button type="button" className="btn btn-ghost" onClick={() => setShowPw((v) => !v)}>
                 {showPw ? "Ẩn" : "Hiện"}
               </button>
               <button
                 type="button"
                 className="btn btn-ghost"
-                disabled={noEncrypt}
                 title="Tạo mật khẩu ngẫu nhiên 20 ký tự"
                 onClick={() => {
                   setPassword(randomPassword());
@@ -372,11 +377,11 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
                 </span>
               </>
             ) : (
-              <span className={`small ${noEncrypt ? "text-danger" : "muted"}`}>
-                {noEncrypt
-                  ? "Không mã hoá: ai có ảnh và file khoá đều đọc được nội dung, và máy chủ cũng thấy nội dung."
-                  : "Nhập mật khẩu, hoặc bấm Tạo để có mật khẩu ngẫu nhiên. Nội dung và file khoá sẽ được mã hoá AES-256."}
+              <span className="small muted">
+                Nhập mật khẩu, hoặc bấm Tạo để có mật khẩu ngẫu nhiên. Nội dung và file khoá sẽ được mã hoá AES-256.
               </span>
+            )}
+              </>
             )}
             <label className="check">
               <input
@@ -387,7 +392,7 @@ export function EmbedPanel({ maxRedundancy, onSend, onResult, saveToAccount }: P
                   if (e.target.checked) setPassword("");
                 }}
               />
-              Không mã hoá (không khuyên dùng)
+              Không mã hoá
             </label>
           </div>
         </div>

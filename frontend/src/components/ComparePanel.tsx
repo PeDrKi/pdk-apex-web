@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type CompareResult, type Session } from "../api";
-import { nf } from "../utils";
+import { formatBytes, nf } from "../utils";
 import { Alert } from "./Alert";
 import { Dropzone } from "./Dropzone";
 
@@ -10,6 +10,8 @@ const VIEWS: { id: View; label: string }[] = [
   { id: "heat", label: "Bản đồ nhiệt" },
   { id: "slide", label: "Trượt trước/sau" },
 ];
+
+const sign = (d: number) => (d >= 0 ? "+" : "−");
 
 export function ComparePanel({ session }: { session: Session | null }) {
   const [original, setOriginal] = useState<File | null>(null);
@@ -115,6 +117,32 @@ export function ComparePanel({ session }: { session: Session | null }) {
               <dd>{result.psnr_db === null ? "∞" : `${result.psnr_db.toFixed(1)} dB`}</dd>
             </div>
           </dl>
+
+          <dl className="stats stats-3">
+            <div>
+              <dt>Dung lượng ảnh gốc (PNG)</dt>
+              <dd>{formatBytes(result.original_png_bytes)}</dd>
+            </div>
+            <div>
+              <dt>Dung lượng ảnh đã giấu (PNG)</dt>
+              <dd>{formatBytes(result.stego_png_bytes)}</dd>
+            </div>
+            <div>
+              <dt>Chênh lệch</dt>
+              <dd>
+                {sign(result.stego_png_bytes - result.original_png_bytes)}
+                {formatBytes(Math.abs(result.stego_png_bytes - result.original_png_bytes))} (
+                {sign(result.stego_png_bytes - result.original_png_bytes)}
+                {(Math.abs(result.stego_png_bytes - result.original_png_bytes) / Math.max(1, result.original_png_bytes) * 100).toFixed(1)}%)
+              </dd>
+            </div>
+          </dl>
+          <p className="muted small">
+            Cả hai ảnh đều tính ở dạng PNG để so cùng điều kiện.
+            {original && stego && original.size !== result.original_png_bytes && (
+              <> File gốc tải lên là {formatBytes(original.size)} ({original.type || "không rõ định dạng"}); file đã giấu là {formatBytes(stego.size)}.</>
+            )}
+          </p>
 
           {result.changed_pixels === 0 ? (
             <Alert kind="warn">Hai ảnh giống hệt nhau, không có điểm ảnh nào khác biệt.</Alert>

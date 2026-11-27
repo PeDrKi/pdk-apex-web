@@ -702,6 +702,8 @@ class CompareOut(BaseModel):
     max_diff: int
     mean_diff: float
     psnr_db: Optional[float]
+    original_png_bytes: int  # ảnh gốc lưu PNG, để so dung lượng cùng định dạng với ảnh đã giấu
+    stego_png_bytes: int
 
 
 @app.post("/api/compare", response_model=CompareOut)
@@ -716,7 +718,8 @@ async def compare_images(original: UploadFile = File(...), stego: UploadFile = F
         except ValueError as e:
             raise HTTPException(400, str(e))
         return CompareOut(heatmap_png_base64=_b64(to_png_bytes(r.pop("heatmap"))),
-                          overlay_png_base64=_b64(to_png_bytes(r.pop("overlay"))), **r)
+                          overlay_png_base64=_b64(to_png_bytes(r.pop("overlay"))),
+                          original_png_bytes=len(to_png_bytes(a)), stego_png_bytes=len(to_png_bytes(b)), **r)
 
     return await _heavy(work)
 

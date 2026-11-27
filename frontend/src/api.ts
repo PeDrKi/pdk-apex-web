@@ -171,6 +171,8 @@ export interface CompareResult {
   max_diff: number;
   mean_diff: number;
   psnr_db: number | null;
+  original_png_bytes: number;
+  stego_png_bytes: number;
 }
 
 /** Ảnh gốc, ảnh đã giấu và khoá của lần giấu tin gần nhất, để chuyển sang tab khác. */

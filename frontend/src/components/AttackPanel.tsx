@@ -14,10 +14,9 @@ import { isZip, unpackBundle } from "../lib/zip";
 import { base64ToBlob, downloadBlob, stem } from "../utils";
 import { Alert } from "./Alert";
 import { Dropzone } from "./Dropzone";
-import { ImageEditor } from "./ImageEditor";
+import { ImageEditor, stepLabel } from "./ImageEditor";
 import { RevealedView } from "./RevealedView";
 
-const MAX_STEPS = 2;
 const LEVELS = ["Nhẹ", "Vừa", "Nặng"];
 const STATUS_TEXT: Record<AttackStatus, string> = {
   intact: "Nguyên vẹn",
@@ -27,14 +26,6 @@ const STATUS_TEXT: Record<AttackStatus, string> = {
 
 function StatusTag({ status }: { status: AttackStatus }) {
   return <span className={`tag tag-${status}`}>{STATUS_TEXT[status]}</span>;
-}
-
-function customLabel(s: AttackStep): string | null {
-  const p = s.params;
-  if (!p) return null;
-  if (s.id === "crop_custom") return `Cắt vùng ${Math.round(p.w * 100)}%×${Math.round(p.h * 100)}% từ (${Math.round(p.x * 100)}%, ${Math.round(p.y * 100)}%)`;
-  if (s.id === "resize_custom") return `Đổi kích thước ${p.w}×${p.h}`;
-  return null;
 }
 
 function pct(ber: number | null) {
@@ -100,8 +91,7 @@ export function AttackPanel({ session }: { session: Session | null }) {
   useEffect(() => () => void (originalUrl && URL.revokeObjectURL(originalUrl)), [originalUrl]);
 
   function addStep(a: AttackInfo) {
-    if (steps.length >= MAX_STEPS) return;
-    setSteps([...steps, { id: a.id, value: a.param === "quality" ? 50 : 2 }]);
+    setSteps([{ id: a.id, value: a.param === "quality" ? 50 : 2 }]);
   }
 
   function updateStep(i: number, value: number) {
@@ -187,8 +177,8 @@ export function AttackPanel({ session }: { session: Session | null }) {
             <button type="button" className="btn btn-primary" disabled={!image || !keys || !!busy} onClick={() => run("attack", [{ id: "bc7", value: 0 }])}>
               {busy === "attack" ? "Đang chạy…" : "Thử ngay BC7"}
             </button>
-            <button type="button" className="btn" disabled={steps.length >= MAX_STEPS} onClick={() => addStep(bc7)}>
-              + Thêm vào chuỗi
+            <button type="button" className="btn" onClick={() => addStep(bc7)}>
+              Chọn BC7
             </button>
           </div>
         </div>
@@ -198,24 +188,26 @@ export function AttackPanel({ session }: { session: Session | null }) {
         <div className="editor-open">
           <div>
             <span className="field-label">Chỉnh ảnh như trình chỉnh sửa</span>
-            <p className="muted small">Mở ảnh trên canvas để tự cắt vùng mong muốn và đổi kích thước, rồi thêm vào chuỗi tấn công.</p>
+            <p className="muted small">Mở ảnh trên canvas để chọn vùng cắt hoặc xoá, đổi kích thước, thêm nhiễu, lọc, màu sắc, hình học, nén BC7, rồi xem trước kết quả.</p>
           </div>
-          <button type="button" className="btn" disabled={steps.length >= MAX_STEPS} onClick={() => setEditing(true)}>
+          <button type="button" className="btn" onClick={() => setEditing(true)}>
             Mở trình chỉnh ảnh
           </button>
         </div>
       )}
-      {editing && originalUrl && (
+      {editing && originalUrl && image && (
         <ImageEditor
           src={originalUrl}
-          slotsLeft={MAX_STEPS - steps.length}
+          file={image}
+          catalog={catalog}
+          initial={steps}
           onClose={() => setEditing(false)}
-          onApply={(st) => setSteps([...steps, ...st].slice(0, MAX_STEPS))}
+          onApply={setSteps}
         />
       )}
 
       <fieldset className="field">
-        <legend className="field-label">3. Chọn phép tấn công (tối đa {MAX_STEPS}, áp dụng lần lượt)</legend>
+        <legend className="field-label">3. Chọn phép tấn công (chọn một phép)</legend>
         <div className="attack-groups">
           {groups.map(([g, list]) => (
             <div key={g} className="attack-group">
@@ -226,7 +218,6 @@ export function AttackPanel({ session }: { session: Session | null }) {
                     key={a.id}
                     type="button"
                     className="chip"
-                    disabled={steps.length >= MAX_STEPS}
                     title={a.geometric ? "Phép hình học: làm lệch lưới điểm ảnh" : a.hint}
                     onClick={() => addStep(a)}
                   >
@@ -243,7 +234,7 @@ export function AttackPanel({ session }: { session: Session | null }) {
         <ol className="chain">
           {steps.map((s, i) => {
             const a = byId.get(s.id);
-            const custom = s.params ? customLabel(s) : null;
+            const custom = s.params ? stepLabel(s, byId) : null;
             if (!a && !custom) return null;
             return (
               <li key={i}>

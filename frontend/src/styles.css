@@ -345,3 +345,7 @@ a.btn { text-decoration: none; }
 .bc7-card > div:first-child { flex: 1 1 320px; }
 .bc7-badge { font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.12em; padding: 2px 8px; background: #00e5a0; color: #04110d; }
 .bc7-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.chip-bc7 { border-color: #00e5a0; color: #00e5a0; }
+.editor-side { flex: 0 1 380px; }
+.editor-result { display: grid; gap: 8px; margin-top: 12px; }
+.editor-result .editor-preview { max-height: 240px; width: auto; }

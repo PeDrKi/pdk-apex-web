@@ -81,8 +81,7 @@ def test_heavy_crop_reads_back_exactly(client):
         img[y:y + s, x:x + s] = rng.integers(0, 255, 3)
     _, stego, keys = _embed(client, png_bytes(img.astype(np.uint8)), "Thẻ rồng #001",
                             redundancy=15, delta=16)
-    for steps in ([{"id": "crop", "value": 2}], [{"id": "shift", "value": 3}],
-                  [{"id": "crop", "value": 2}, {"id": "jpeg", "value": 70}]):
+    for steps in ([{"id": "crop", "value": 2}], [{"id": "shift", "value": 3}]):
         r = client.post("/api/attack", data={"steps": json.dumps(steps)}, files={
             "image": ("s.png", stego, "image/png"), "keys": ("k.npz", keys, "application/octet-stream")})
         j = r.json()

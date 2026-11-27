@@ -14,7 +14,7 @@ from PIL import Image
 
 from apexmark import attacks as A
 
-MAX_CHAIN = 2
+MAX_CHAIN = 1
 ROTATE_DEG = {1: 2.0, 2: 8.0, 3: 20.0}
 
 
@@ -69,6 +69,16 @@ def _crop_custom(im: np.ndarray, p: dict) -> np.ndarray:
     return im[y0:y1, x0:x1].astype(np.float64)
 
 
+def _erase_custom(im: np.ndarray, p: dict) -> np.ndarray:
+    """Xoá (tô trắng) vùng đã chọn, ảnh giữ nguyên kích thước và lưới điểm ảnh."""
+    h, w = im.shape[:2]
+    x0, y0 = int(round(p["x"] * w)), int(round(p["y"] * h))
+    x1, y1 = int(round((p["x"] + p["w"]) * w)), int(round((p["y"] + p["h"]) * h))
+    out = im.astype(np.float64).copy()
+    out[y0:y1, x0:x1] = 255
+    return out
+
+
 def _resize_custom(im: np.ndarray, p: dict) -> np.ndarray:
     img = Image.fromarray(np.clip(im, 0, 255).astype(np.uint8))
     return np.asarray(img.resize((int(p["w"]), int(p["h"])), Image.BILINEAR), dtype=np.float64)
@@ -79,10 +89,12 @@ def _resize_custom(im: np.ndarray, p: dict) -> np.ndarray:
 CUSTOM: dict[str, Attack] = {
     "crop_custom": Attack("crop_custom", "Cắt vùng tự chọn", "Chỉnh tay", "region", True,
                           lambda im, v: im, "Kéo chọn vùng trên ảnh"),
+    "erase_custom": Attack("erase_custom", "Xoá vùng tự chọn", "Chỉnh tay", "region", False,
+                           lambda im, v: im, "Kéo chọn vùng để xoá (tô trắng)"),
     "resize_custom": Attack("resize_custom", "Đổi kích thước tự chọn", "Chỉnh tay", "size", True,
                             lambda im, v: im, "Nhập chiều rộng và chiều cao"),
 }
-_CUSTOM_FN = {"crop_custom": _crop_custom, "resize_custom": _resize_custom}
+_CUSTOM_FN = {"crop_custom": _crop_custom, "erase_custom": _erase_custom, "resize_custom": _resize_custom}
 BY_ID = {a.id: a for a in CATALOG}
 BY_ID.update(CUSTOM)
 
@@ -102,6 +114,9 @@ class Step:
         if self.attack.id == "crop_custom":
             p = self.params
             return f"Cắt vùng {p['w'] * 100:.0f}%×{p['h'] * 100:.0f}% từ ({p['x'] * 100:.0f}%, {p['y'] * 100:.0f}%)"
+        if self.attack.id == "erase_custom":
+            p = self.params
+            return f"Xoá vùng {p['w'] * 100:.0f}%×{p['h'] * 100:.0f}% tại ({p['x'] * 100:.0f}%, {p['y'] * 100:.0f}%)"
         if self.attack.id == "resize_custom":
             return f"Đổi kích thước {int(self.params['w'])}×{int(self.params['h'])}"
         if self.attack.param == "quality":
@@ -120,7 +135,7 @@ def _num(v, lo, hi) -> float:
 def _parse_custom(aid: str, raw) -> dict:
     if not isinstance(raw, dict):
         raise AttackError("Thiếu thông số cho phép chỉnh tay.")
-    if aid == "crop_custom":
+    if aid in ("crop_custom", "erase_custom"):
         p = {k: _num(raw.get(k), 0.0, 1.0) for k in ("x", "y", "w", "h")}
         if p["w"] < 0.02 or p["h"] < 0.02 or p["x"] + p["w"] > 1.0001 or p["y"] + p["h"] > 1.0001:
             raise AttackError("Vùng cắt không hợp lệ.")
@@ -135,7 +150,7 @@ def parse_steps(raw: str) -> list[Step]:
     except (ValueError, RecursionError):
         raise AttackError("Danh sách phép tấn công không hợp lệ.")
     if not isinstance(items, list) or not 1 <= len(items) <= MAX_CHAIN:
-        raise AttackError(f"Hãy chọn từ 1 đến {MAX_CHAIN} phép tấn công.")
+        raise AttackError("Hãy chọn đúng 1 phép tấn công.")
     steps = []
     for it in items:
         if not isinstance(it, dict) or it.get("id") not in BY_ID:

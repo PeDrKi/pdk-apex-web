@@ -32,9 +32,9 @@ def test_attack_jpeg_then_read(client, photo):
     assert Image.open(io.BytesIO(base64.b64decode(j["attacked_png_base64"]))).size == (512, 384)
 
 
-def test_attack_chain_geometric_logo(client, photo):
+def test_attack_geometric_logo(client, photo):
     _, stego, keys = _embed_logo(client, png_bytes(photo), redundancy=8, delta=24)
-    j = _attack(client, stego, keys, [{"id": "crop", "value": 1}, {"id": "gaussian_noise", "value": 1}]).json()
+    j = _attack(client, stego, keys, [{"id": "crop", "value": 1}]).json()
     assert j["width"] < 512 and j["extract"]["kind"] == "logo" and j["extract"]["used_resync"]
     assert j["ber"] < 0.1
 
@@ -54,7 +54,7 @@ def test_attack_encrypted_needs_password(client, photo):
 
 @pytest.mark.parametrize("steps", [
     "not json", [], [{"id": "nope"}], [{"id": "jpeg", "value": 200}], [{"id": "rotate", "value": 9}],
-    [{"id": "rotate", "value": "2"}], [{"id": "jpeg", "value": 50}] * 3, {"id": "jpeg"},
+    [{"id": "rotate", "value": "2"}], [{"id": "jpeg", "value": 50}] * 2, {"id": "jpeg"},
 ])
 def test_attack_bad_steps(client, photo, steps):
     raw = steps if isinstance(steps, str) else json.dumps(steps)
@@ -102,13 +102,10 @@ def test_custom_crop_and_resize_steps():
     import numpy as np
     from app import attacks as atk
     img = (np.random.RandomState(0).rand(100, 120, 3) * 255).astype(np.uint8)
-    plan = atk.parse_steps(json.dumps([
-        {"id": "crop_custom", "params": {"x": 0.25, "y": 0.1, "w": 0.5, "h": 0.5}},
-        {"id": "resize_custom", "params": {"w": 80, "h": 40}},
-    ]))
-    out = atk.apply_steps(img, plan)
-    assert out.shape[:2] == (40, 80)
-    assert "Cắt vùng" in plan[0].label and "80×40" in plan[1].label
+    crop = atk.parse_steps(json.dumps([{"id": "crop_custom", "params": {"x": 0.25, "y": 0.1, "w": 0.5, "h": 0.5}}]))
+    assert atk.apply_steps(img, crop).shape[:2] == (50, 60) and "Cắt vùng" in crop[0].label
+    rs = atk.parse_steps(json.dumps([{"id": "resize_custom", "params": {"w": 80, "h": 40}}]))
+    assert atk.apply_steps(img, rs).shape[:2] == (40, 80) and "80×40" in rs[0].label
     for bad in ({"x": 0.8, "y": 0, "w": 0.5, "h": 0.5}, {"x": 0, "y": 0, "w": 0.0, "h": 1}):
         try:
             atk.parse_steps(json.dumps([{"id": "crop_custom", "params": bad}]))
@@ -120,3 +117,13 @@ def test_custom_crop_and_resize_steps():
         assert False
     except atk.AttackError:
         pass
+
+
+def test_custom_erase_keeps_size_and_blanks_region():
+    import json
+    import numpy as np
+    from app import attacks as atk
+    img = np.zeros((100, 120, 3), np.uint8)
+    out = atk.apply_steps(img, atk.parse_steps(json.dumps(
+        [{"id": "erase_custom", "params": {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25}}])))
+    assert out.shape == img.shape and out[60, 70].min() == 255 and out[10, 10].max() == 0
